@@ -1,5 +1,4 @@
-venv/*
+.venv/*
 datasets/*
-runs/*
 *.avi
-*.pt
+__pycache__/*

@@ -22,9 +22,9 @@ def main():
         if img_path.endswith(".png"):
             n_frames += 1
             query_image = cv2.imread(FOLDER_DIR+img_path)
-            gray_query_iamge = cv2.cvtColor(query_image, cv2.COLOR_BGR2GRAY)
+            gray_query_image = cv2.cvtColor(query_image, cv2.COLOR_BGR2GRAY)
 
-            keypoints, descriptors = orb.detectAndCompute(gray_query_iamge, None)
+            keypoints, descriptors = orb.detectAndCompute(gray_query_image, None)
 
             # Try plotting all points without matching
             for keypoint in keypoints:
