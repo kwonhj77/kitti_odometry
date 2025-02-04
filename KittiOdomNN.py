@@ -2,14 +2,18 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 import time
+from trainer import train
+from tester import test
 
 # Used for validation
 from torchsummary import summary
 from device import get_device
 from datasets.KittiOdomDataset import KittiOdomDataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 
-
+# image_size=(376, 1241)
+NUM_EPOCHS = 3
+BATCH_SIZE = 19
 class KittiOdomNN(nn.Module):
     def __init__(self, in_channels: int = 3, device=None):
         super().__init__()
@@ -55,15 +59,46 @@ class KittiOdomNN(nn.Module):
     
 if __name__ == '__main__':
     device = get_device()
-    model = KittiOdomNN(in_channels=3, image_size=(376, 1241), device=device).to(device)
+    model = KittiOdomNN(in_channels=3, device=device).to(device)
 
-    dataset = KittiOdomDataset(r'datasets\data_odometry_csv\00.csv')
-    dataloader = DataLoader(dataset, batch_size=19, pin_memory=True)
+    all_datasets = []
+    for sequence in range(0,11):
+        if sequence < 10:
+            sequence = f"0{sequence}"
+        else:
+            sequence = str(sequence)
+        fpath = f'datasets/data_odometry_csv/{sequence}.csv'
+        all_datasets.append(KittiOdomDataset(fpath))
 
-    for batch_idx, sample in enumerate(dataloader):
-        X = sample['image']
-        out = model(X.to(device))
-        print(type(out))
-        break
+    train_dataset = ConcatDataset(dataset for dataset in all_datasets[:7])
+    test_dataset = ConcatDataset(dataset for dataset in all_datasets[7:])
+
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, pin_memory=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, pin_memory=True)
+
+    # for batch_idx, sample in enumerate(dataloader):
+    #     X = sample['image']
+    #     out = model(X.to(device))
+    #     print(type(out))
+    #     break
 
     summary(model, (3, 376, 1241), device=device)
+
+    loss_fn = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.000001, betas=(0.9, 0.999), eps=1e-08)
+
+    print("Training start")
+    train_start = time.time()
+    for epoch in range(NUM_EPOCHS):
+        print(f"Epoch {epoch+1}\n-------------------------------")
+        epoch_start = time.time()
+        train(dataloader=train_dataloader, model=model, loss_fn=loss_fn, optimizer=optimizer, device=device)
+        test(dataloader=test_dataloader, model=model, loss_fn=loss_fn, device=device)
+        epoch_end = time.time() - epoch_start
+        print(f"Epoch {epoch+1} Time Elapsed: {epoch_end}")
+
+    train_end = time.time() - train_start
+    print(f"Time Elapsed during training: {train_end}")
+
+
+

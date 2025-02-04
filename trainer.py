@@ -5,8 +5,8 @@ from torch.utils.data import DataLoader
 def train(dataloader: DataLoader, model: nn.Module, loss_fn: nn.Module, optimizer: torch.optim.Optimizer, device: torch.device):
     size = len(dataloader.dataset)
     model.train()
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
+    for batch, value in enumerate(dataloader):
+        X, y = value['image'].to(device), value['odom'].to(device)
 
         # Compute prediction error
         pred = model(X)
