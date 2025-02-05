@@ -1,4 +1,6 @@
+**/__pycache__/*
 .venv/*
+.vscode/*
+checkpoints/*
 datasets/*
-*.avi
-__pycache__/*
+results/*

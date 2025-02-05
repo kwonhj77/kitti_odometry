@@ -7,7 +7,6 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 
-
 class KittiOdomDataset(torch.utils.data.Dataset):
     def _maybe_resize_image(self, image, size):
         # size is (width, height)
@@ -16,8 +15,13 @@ class KittiOdomDataset(torch.utils.data.Dataset):
             image = image.resize(size)
         return image
 
-    def __init__(self, csv_file):
-        dataframe = pd.read_csv(csv_file)
+    def __init__(self, sequence):
+        if sequence < 10:
+            sequence = f"0{sequence}"
+        else:
+            sequence = str(sequence)
+        fpath = f'datasets/data_odometry_csv/{sequence}.csv'
+        dataframe = pd.read_csv(fpath)
         self.img_fpaths = dataframe["img_fpaths"].to_numpy()
         self.odom_poses = dataframe[[f"odom_{i}" for i in range(1, 13)]].to_numpy()
 
@@ -37,21 +41,33 @@ class KittiOdomDataset(torch.utils.data.Dataset):
         img_tensor = transform(image)
 
         odom_pose = torch.from_numpy(self.odom_poses[index]).float()
-
-        sample = {'image': img_tensor, 'odom': odom_pose}
-        return sample
     
+        return img_tensor, odom_pose
+
+def get_dataloaders(sequences, batch_size):
+    datasets = []
+    if isinstance(sequences, list):
+        for sequence in sequences:
+            datasets.append(KittiOdomDataset(sequence))
+    elif isinstance(sequences, tuple):
+        for sequence in range(*sequences):
+            datasets.append(KittiOdomDataset(sequence))
+    else:
+        raise Exception("Sequences is not list or tuple!")
+    
+    return [DataLoader(dataset, batch_size=batch_size, pin_memory=True) for dataset in datasets]
+
 
 # Code to verify dataloader is working
 if __name__ == '__main__':
-    dataset = KittiOdomDataset(r'datasets\data_odometry_csv\00.csv')
+    dataset = KittiOdomDataset(0)
     dataloader = DataLoader(dataset, batch_size=239)
 
-    for batch_idx, sample in enumerate(dataloader):
-        print(batch_idx, sample['image'].size(), sample['odom'].size())
-        print(sample['odom'][0])
+    for batch_idx, (X,y) in enumerate(dataloader):
+        print(batch_idx, X.size(), X.size())
+        print(y[0])
         transform = torchvision.transforms.ToPILImage()
-        pil_img = transform(sample['image'][0])
+        pil_img = transform(y[0])
         pil_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_BGR2RGB) 
         cv2.imshow('img',np.array(pil_img))
         cv2.waitKey(0)
