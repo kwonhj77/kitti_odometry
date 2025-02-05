@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 # Local imports
 from utils.ResultRecorder import DatasetResultRecorder, TestResultRecorder
 from utils.Timer import convert_time
-from tester import test
+from utils.Tester import test
 
 def _train(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, optimizer: torch.optim.Optimizer, device: torch.device):
     train_recorder = TestResultRecorder(train=True)

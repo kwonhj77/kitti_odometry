@@ -8,8 +8,8 @@ from utils.KittiOdomNN import KittiOdomNN
 from utils.KittiOdomDataset import get_dataloaders
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
-from trainer import train_and_eval
-from tester import test
+from utils.Trainer import train_and_eval
+from utils.Tester import test
 
 def get_argparser():
     # Parse input arguments
@@ -34,14 +34,14 @@ def get_argparser():
 
 def main():
     args = get_argparser()
+    params = load_params(args.params)
 
     device = get_device()
-    model = KittiOdomNN(in_channels=3, device=device).to(device)
+    model = KittiOdomNN(gru_hidden_size=params['gru_hidden_size'], in_channels=3, device=device).to(device)
     # TODO: loss fn and image size should be set outside of this function
     loss_fn = nn.MSELoss()
     summary(model, (3, 376, 1241), device=device)
 
-    params = load_params(args.params)
 
     if args.test:
         test_dataloaders = get_dataloaders(params['test_sequences'], params['batch_size'])
