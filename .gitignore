@@ -2,5 +2,5 @@
 .venv/*
 .vscode/*
 checkpoints/*
-datasets/*
+dataset/*
 results/*

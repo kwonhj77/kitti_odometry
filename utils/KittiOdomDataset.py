@@ -7,7 +7,51 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 
-class KittiOdomDataset(torch.utils.data.Dataset):
+import pykitti
+
+BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
+
+class KittiOdomDataset():
+    def __init__(self, sequences: range, batch_len: int):
+        self.sequences_len = [
+            4540,
+            1100,
+            4660,
+            800,
+            270,
+            2760,
+            1100,
+            1100,
+            4070,
+            1590,
+            1200
+        ]
+        self.dataset = []
+        for seq in sequences:
+            batch_datasets = []
+            for batch_idx in range(0, self.sequences_len[seq], batch_len):
+                seq_fname = f"0{seq}" if seq < 10 else str(seq)
+                batch_end_frame = batch_idx+batch_len if batch_idx+batch_len <= self.sequences_len[seq] else self.sequences_len[seq]
+                # print(f"----------- \nSeq: {seq} \n Batch frame range: {batch_idx}:{batch_end_frame-1}")
+
+                batch = pykitti.odometry(BASE_DIR, seq_fname, frames=(batch_idx, batch_end_frame, 1))
+
+                # Adjust the poses so that the first frame in the batch is the global origin.
+                init_pose = batch.poses[0]
+                assert np.linalg.det(init_pose) != 0, "Pose matrix is singular! This shouldn't ever be the case AFAIK..."
+                init_pose_inverse = np.linalg.inv(init_pose)
+                batch.poses = [np.matmul(init_pose_inverse, pose) for pose in batch.poses]
+                # batch.get_cam2()
+                # batch.poses
+                batch_datasets.append(batch)
+            self.dataset.append(batch_datasets)
+
+
+
+
+
+
+class _KittiOdomDataset(torch.utils.data.Dataset):
     def _maybe_resize_image(self, image, size):
         # size is (width, height)
         width, height = image.size
@@ -60,16 +104,18 @@ def get_dataloaders(sequences, batch_size):
 
 # Code to verify dataloader is working
 if __name__ == '__main__':
-    dataset = KittiOdomDataset(0)
-    dataloader = DataLoader(dataset, batch_size=239)
+    dataset = KittiOdomDataset(range(0,8), 100)
 
-    for batch_idx, (X,y) in enumerate(dataloader):
-        print(batch_idx, X.size(), X.size())
-        print(y[0])
-        transform = torchvision.transforms.ToPILImage()
-        pil_img = transform(y[0])
-        pil_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_BGR2RGB) 
-        cv2.imshow('img',np.array(pil_img))
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        break
+    # Plot sequence 0, with adjusted poses
+    # import matplotlib.pyplot as plt
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+
+    # for batch_dataset in dataset.dataset[0]:
+    #     ground_truth = np.array(batch_dataset.poses)
+    #     ax.plot(ground_truth[:,:,3][:,0], ground_truth[:,:,3][:,1], ground_truth[:,:,3][:,2])
+
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_zlabel('z')
+    # plt.show()
