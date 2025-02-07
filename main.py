@@ -5,7 +5,7 @@ from torchsummary import summary
 
 # Local imports
 from utils.KittiOdomNN import KittiOdomNN
-from utils.KittiOdomDataset import get_dataloaders
+from utils.KittiOdomDataset import get_batches
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
 from utils.Trainer import train_and_eval
@@ -44,7 +44,7 @@ def main():
 
 
     if args.test:
-        test_dataloaders = get_dataloaders(params['test_sequences'], params['batch_size'])
+        test_dataloaders = get_batches(params['test_sequences'], params['batch_len'])
     else:
         test_dataloaders = []
 
@@ -55,9 +55,9 @@ def main():
         model.load_state_dict(checkpoint)
         if args.test:
             print("Evaluating checkpoint...")
-            test_results = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
+            test_results = test(dataloader=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
     elif args.train:
-        train_dataloaders = get_dataloaders(params['train_sequences'], params['batch_size'])
+        train_dataloaders = get_batches(params['train_sequences'], params['batch_len'])
         train_results, test_results = train_and_eval(
             train_dataloaders=train_dataloaders,
             test_dataloaders=test_dataloaders,
@@ -73,14 +73,15 @@ def main():
     
     if args.save_checkpoint:
         fpath = f'./checkpoints/{args.save_checkpoint}' + '.pt'
-        print("Saving model checkpoint to: \n" + fpath + '.pt')
+        print("Saving model checkpoint to: \n" + fpath)
         torch.save(model.state_dict(), fpath)
 
     if args.save_train_results:
         fpath = f'./results/train/'
         print("Saving train results to: \n" + fpath + f'\n with name {args.save_train_results}')
         for epoch, result in enumerate(train_results):
-            result.to_csv(fpath + args.save_train_results + f'_epoch_{epoch}.csv')
+            for dataset_idx, recorder in result.items():
+                recorder.to_csv(fpath + args.save_train_results + f'_dataset_{dataset_idx}_epoch_{epoch}.csv')
 
     if args.save_test_results:
         if args.load_checkpoint: # Only 1 recorder
@@ -91,7 +92,8 @@ def main():
             fpath = f'./results/test/'
             print("Saving test results to: \n" + fpath + f'\n with name {args.save_test_results}')
             for epoch, result in enumerate(test_results):
-                result.to_csv(fpath + args.save_test_results + f'_epoch_{epoch}.csv')
+                for dataset_idx, recorder in result.items():
+                    recorder.to_csv(fpath + args.save_test_results + f'_dataset_{dataset_idx}_epoch_{epoch}.csv')
 
 
 

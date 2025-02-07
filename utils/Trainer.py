@@ -4,46 +4,49 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 # Local imports
-from utils.ResultRecorder import DatasetResultRecorder, TestResultRecorder
+from utils.ResultRecorder import ResultRecorder
 from utils.Timer import convert_time
 from utils.Tester import test
 
 def _train(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, optimizer: torch.optim.Optimizer, device: torch.device):
-    train_recorder = TestResultRecorder(train=True)
-    for idx, dataloader in enumerate(dataloaders):
-        size = len(dataloader.dataset)
-        ds_recorder = DatasetResultRecorder(size=size, num_batches=len(dataloader), dataset_idx=idx, train=True)
 
-        print(f"Train dataset #{idx} ------------")
-        model.train()
-        for batch, (X,y) in enumerate(dataloader):
-            X, y = X.to(device), y.to(device)
+    model.train()
 
-            # Compute prediction error
-            pred = model(X)
-            loss = loss_fn(pred, y)
+    train_results = {}
+    num_batches = len(dataloaders)
+    for batch, dataloader in enumerate(dataloaders):
+        assert len(dataloader) == 1, "only 1 batch should be in each dataloader!"
+        dataset_idx = dataloader.dataset.dataset.sequence
 
-            ds_recorder.add_batch_results(loss=loss.detach().clone(), label=y, prediction=pred)
+        if dataset_idx not in train_results:
+            train_results[dataset_idx] = ResultRecorder(dataset_idx=dataset_idx, train=True)
 
-            # Backprop
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+        batch_size = len(dataloader.dataset)
 
-            if batch % 10 == 0:
-                loss, current = loss.item(), (batch + 1) * len(X)
-                print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]\n")
-        
-        ds_recorder.calculate_results(verbose=True)
+        X, y = next(iter(dataloader))
+        X, y = X.to(device), y.to(device)
 
-        train_recorder.append_ds_recorder(ds_recorder)
+        # Compute prediction error
+        pred = model(X)
+        loss = loss_fn(pred, y)
 
-    train_recorder.calculate_results(verbose=True)
+        train_results[dataset_idx].add_batch_results(loss=loss.detach().clone(), label=y, prediction=pred, batch_size=batch_size)
 
-    return train_recorder
+        # Backprop
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+        if batch % 10 == 0:
+            print(f"Train L2 loss: {loss.item():>7f}  [batch {batch:>5d}/{num_batches:>5d}]\n")
+    
+    for idx, recorder in train_results.items():
+        recorder.calculate_results(verbose=True)
+
+    return train_results
 
 def train_and_eval(train_dataloaders: list[DataLoader], test_dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, device: torch.device, params: dict, run_test: bool):
-    print("Training start")
+    print("################## Training start ##################")
     train_start = time.time()
     optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'], betas=(0.9, 0.999), eps=1e-08)
 

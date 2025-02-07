@@ -1,10 +1,63 @@
 import numpy as np
 import pandas as pd
 
+class ResultRecorder():
+    def __init__(self, dataset_idx, train):
+        self.dataset_idx = dataset_idx
+        if train:
+            self.train_or_test = "Train"
+        else:
+            self.train_or_test = "Test"
+
+        # Sequentially added by add_batch_results
+        keys = ["predictions", "labels", "l2_losses", "diffs", "size"]
+        self.batch_results = {key: list() for key in keys}
+
+        # Calculated with calculate_results
+        self.dataset_mean_loss = None
+        self.dataset_mean_diffs = None
+    
+    def add_batch_results(self, loss, label, prediction, batch_size):
+        prediction = np.array(prediction.cpu().detach())
+        label = np.array(label.cpu().detach())
+        self.batch_results["predictions"].append(prediction)
+        self.batch_results["labels"].append(label)
+        self.batch_results["l2_losses"].append(loss.cpu().detach().numpy())
+        self.batch_results["diffs"].append(np.abs(prediction-label))
+        self.batch_results["size"].append(batch_size)
+
+    def calculate_results(self, verbose):
+        self.dataset_mean_loss = np.average(self.batch_results["l2_losses"], weights=self.batch_results["size"])
+        mean_diffs_per_batch = []
+        for batch_diff in self.batch_results["diffs"]:
+            mean_diffs_per_batch.append(np.mean(batch_diff, axis=0))
+        self.dataset_mean_diffs = np.average(mean_diffs_per_batch, weights=self.batch_results["size"], axis=0)
+
+        if verbose:
+            mean_diffs_str = [f"{d:.4f}" for d in self.dataset_mean_diffs]
+            print(f"--- \nDataset {self.dataset_idx} {self.train_or_test} Error: \n  Mean Absolute Error: {mean_diffs_str} \n  L2 loss: {self.dataset_mean_loss:.8f} \n---\n")
+
+
+
+    def to_csv(self, fpath):
+        columns = ['dataset_idx', 'batch_idx'] + [f'{i}_abs_diff' for i in range(1,13)]
+        df = pd.DataFrame(columns=columns)
+
+        for idx, diff in enumerate(self.batch_results["diffs"]):
+            row = [self.dataset_idx, idx] + diff.tolist()
+            df = pd.concat([df, pd.DataFrame([row], columns=columns)], ignore_index=True)
+
+        df.to_csv(fpath)
+
+    
+
+
+
+
+
 class DatasetResultRecorder():
-    def __init__(self, size, num_batches, dataset_idx, train):
+    def __init__(self, size, dataset_idx, train):
         self.size = size
-        self.num_batches = num_batches
         self.dataset_idx = dataset_idx
         if train:
             self.train_or_test = "Train"

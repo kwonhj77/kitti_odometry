@@ -11,9 +11,53 @@ import pykitti
 
 BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
 
-class KittiOdomDataset():
-    def __init__(self, sequences: range, batch_len: int):
-        self.sequences_len = [
+
+class KittiOdomBatch(torch.utils.data.Dataset):
+    def _maybe_resize_image(self, image, size):
+        # size is (width, height)
+        width, height = image.size
+        if width != size[0] or height != size[1]:
+            image = image.resize(size)
+        return image
+
+    def __init__(self, sequence, frame_start_idx, frame_end_idx):
+        seq_fname = f"0{sequence}" if sequence < 10 else str(sequence)
+        # print(f"----------- \nSeq: {sequence} \n Batch frame range: {frame_start_idx}:{frame_end_idx-1}")
+
+        batch = pykitti.odometry(BASE_DIR, seq_fname, frames=range(frame_start_idx, frame_end_idx, 1))
+
+        # Adjust the poses so that the first frame in the batch is the global origin.
+        init_pose = batch.poses[0]
+        assert np.linalg.det(init_pose) != 0, "Pose matrix is singular! This shouldn't ever be the case AFAIK..."
+        init_pose_inverse = np.linalg.inv(init_pose)
+        batch.poses = [np.matmul(init_pose_inverse, pose) for pose in batch.poses]
+        self.dataset = batch
+
+    def __len__(self):
+        return len(list(self.dataset.frames))
+    
+    def __getitem__(self, index):
+        if torch.is_tensor(index):
+            index = index.tolist()
+        transform = transforms.Compose([
+                transforms.ToTensor(),
+            ])
+        img = self.dataset.get_cam2(index)
+        img = self._maybe_resize_image(img, (1241, 376))
+        img_tensor = transform(img)
+        pose = torch.from_numpy(self.dataset.poses[index].flatten()[:-4]).float()
+    
+        return img_tensor, pose
+
+def _get_batches_from_sequence(sequence, sequence_len, batch_len):
+    batch_datasets = []
+    for frame_start_idx in range(0, sequence_len, batch_len):
+        frame_end_idx = frame_start_idx+batch_len if frame_start_idx+batch_len <= sequence_len else sequence_len
+        batch_datasets.append(KittiOdomBatch(sequence, frame_start_idx, frame_end_idx))
+    return batch_datasets
+
+def get_batches(sequences, batch_len):
+    sequences_len = [
             4540,
             1100,
             4660,
@@ -25,86 +69,73 @@ class KittiOdomDataset():
             4070,
             1590,
             1200
-        ]
-        self.dataset = []
-        for seq in sequences:
-            batch_datasets = []
-            for batch_idx in range(0, self.sequences_len[seq], batch_len):
-                seq_fname = f"0{seq}" if seq < 10 else str(seq)
-                batch_end_frame = batch_idx+batch_len if batch_idx+batch_len <= self.sequences_len[seq] else self.sequences_len[seq]
-                # print(f"----------- \nSeq: {seq} \n Batch frame range: {batch_idx}:{batch_end_frame-1}")
+    ]
+    batches = []
+    if isinstance(sequences, tuple):
+        sequences = range(*sequences)
 
-                batch = pykitti.odometry(BASE_DIR, seq_fname, frames=(batch_idx, batch_end_frame, 1))
+    for sequence in sequences:
+        batches.extend(_get_batches_from_sequence(sequence=sequence, sequence_len=sequences_len[sequence], batch_len=batch_len))
 
-                # Adjust the poses so that the first frame in the batch is the global origin.
-                init_pose = batch.poses[0]
-                assert np.linalg.det(init_pose) != 0, "Pose matrix is singular! This shouldn't ever be the case AFAIK..."
-                init_pose_inverse = np.linalg.inv(init_pose)
-                batch.poses = [np.matmul(init_pose_inverse, pose) for pose in batch.poses]
-                # batch.get_cam2()
-                # batch.poses
-                batch_datasets.append(batch)
-            self.dataset.append(batch_datasets)
+    return [DataLoader(batch, batch_size=len(batch), pin_memory=True) for batch in batches]
 
 
+##########################################
 
+# class _KittiOdomDataset(torch.utils.data.Dataset):
+#     def _maybe_resize_image(self, image, size):
+#         # size is (width, height)
+#         width, height = image.size
+#         if width != size[0] or height != size[1]:
+#             image = image.resize(size)
+#         return image
 
+#     def __init__(self, sequence):
+#         if sequence < 10:
+#             sequence = f"0{sequence}"
+#         else:
+#             sequence = str(sequence)
+#         fpath = f'datasets/data_odometry_csv/{sequence}.csv'
+#         dataframe = pd.read_csv(fpath)
+#         self.img_fpaths = dataframe["img_fpaths"].to_numpy()
+#         self.odom_poses = dataframe[[f"odom_{i}" for i in range(1, 13)]].to_numpy()
 
+#         self.received_invalid_image_sizes = set()
 
-class _KittiOdomDataset(torch.utils.data.Dataset):
-    def _maybe_resize_image(self, image, size):
-        # size is (width, height)
-        width, height = image.size
-        if width != size[0] or height != size[1]:
-            image = image.resize(size)
-        return image
+#     def __len__(self):
+#         return len(self.img_fpaths)
 
-    def __init__(self, sequence):
-        if sequence < 10:
-            sequence = f"0{sequence}"
-        else:
-            sequence = str(sequence)
-        fpath = f'datasets/data_odometry_csv/{sequence}.csv'
-        dataframe = pd.read_csv(fpath)
-        self.img_fpaths = dataframe["img_fpaths"].to_numpy()
-        self.odom_poses = dataframe[[f"odom_{i}" for i in range(1, 13)]].to_numpy()
+#     def __getitem__(self, index):
+#         if torch.is_tensor(index):
+#             index = index.tolist()
+#         transform = transforms.Compose([
+#                 transforms.ToTensor(),
+#             ])
+#         image = Image.open(self.img_fpaths[index])
+#         image = self._maybe_resize_image(image, (1241, 376))
+#         img_tensor = transform(image)
 
-        self.received_invalid_image_sizes = set()
-
-    def __len__(self):
-        return len(self.img_fpaths)
-
-    def __getitem__(self, index):
-        if torch.is_tensor(index):
-            index = index.tolist()
-        transform = transforms.Compose([
-                transforms.ToTensor(),
-            ])
-        image = Image.open(self.img_fpaths[index])
-        image = self._maybe_resize_image(image, (1241, 376))
-        img_tensor = transform(image)
-
-        odom_pose = torch.from_numpy(self.odom_poses[index]).float()
+#         odom_pose = torch.from_numpy(self.odom_poses[index]).float()
     
-        return img_tensor, odom_pose
+#         return img_tensor, odom_pose
 
-def get_dataloaders(sequences, batch_size):
-    datasets = []
-    if isinstance(sequences, list):
-        for sequence in sequences:
-            datasets.append(KittiOdomDataset(sequence))
-    elif isinstance(sequences, tuple):
-        for sequence in range(*sequences):
-            datasets.append(KittiOdomDataset(sequence))
-    else:
-        raise Exception("Sequences is not list or tuple!")
+# def get_dataloaders(sequences, batch_size):
+#     datasets = []
+#     if isinstance(sequences, list):
+#         for sequence in sequences:
+#             datasets.append(KittiOdomDataset(sequence))
+#     elif isinstance(sequences, tuple):
+#         for sequence in range(*sequences):
+#             datasets.append(KittiOdomDataset(sequence))
+#     else:
+#         raise Exception("Sequences is not list or tuple!")
     
-    return [DataLoader(dataset, batch_size=batch_size, pin_memory=True) for dataset in datasets]
+#     return [DataLoader(dataset, batch_size=batch_size, pin_memory=True) for dataset in datasets]
 
 
 # Code to verify dataloader is working
 if __name__ == '__main__':
-    dataset = KittiOdomDataset(range(0,8), 100)
+    dataset = get_batches(sequences=(0,8), batch_len=100)
 
     # Plot sequence 0, with adjusted poses
     # import matplotlib.pyplot as plt
