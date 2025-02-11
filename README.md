@@ -32,6 +32,9 @@ All that's needed is to download the .tar files and extract under ./datasets/seq
 2. Install dependencies
 ` pip install -r ./requirements.txt `
 
+Optional: Verify CUDA / Nvidia drivers are installed
+Run ` nvcc --version ` and ` nvidia-smi ` to check CUDA version and NVIDIA drivers
+
 
 
 ### Example Commands ###
