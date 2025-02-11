@@ -1,4 +1,5 @@
 import argparse
+import os
 import torch
 from torch import nn
 from torchsummary import summary
@@ -81,6 +82,8 @@ def main():
         return
     
     if args.save_checkpoint:
+        if not os.path.exists('./checkpoints'):
+            os.makedirs('./checkpoints')
         fpath = f'./checkpoints/{args.save_checkpoint}' + '.pt'
         print("Saving model checkpoint to: \n" + fpath)
         torch.save(model.state_dict(), fpath)
