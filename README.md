@@ -1,8 +1,36 @@
-# TODOs
-- Intermediate checkpoints between epochs, while saving results
-- Visualizer w/ plots of loss per epoch, per dataset/sequence, and hyperparameters
-- Pretrained model loading and fine-tuning
+# Getting Started
+0. Clone repository
+` git clone https://github.com/kwonhj77/kitti_odometry.git `
+1. Download KITTI dataset
+The dataset must reside under `./datasets` with the following directory structure:
 
+```
+.
+└── dataset
+    ├── poses (already in repo)
+    │   ├── 00.txt
+    │   ├── 01.txt
+    │   ├── ...
+    │   └── 10.txt
+    └── sequences (extract from .tar files)
+        ├── 00 (extract from 00.tar)
+        │   ├── image_2
+        │   ├── calib.txt
+        │   └── times.txt
+        ├── 01 (extract from 01.tar)
+        │   ├── image_2
+        │   ├── calib.txt
+        │   └── times.txt
+        ├── ...
+        └── 10 (extract from 10.tar)
+            ├── image_2
+            ├── calib.txt
+            └── times.txt
+```
+All that's needed is to download the .tar files and extract under ./datasets/sequences. Sequences 11-21 are not needed.
+
+2. Install dependencies
+` pip install -r ./requirements.txt `
 
 
 
@@ -18,6 +46,11 @@ default:
 python main.py --train --save_results default_stacked --test --save_checkpoint default_stacked --params default_stacked > ./logs.txt
 quick:
 python main.py --train --save_results quick_stacked --test --save_checkpoint quick_stacked --params quick_stacked > ./logs.txt
+
+# TODOs
+- Intermediate checkpoints between epochs, while saving results
+- Visualizer w/ plots of loss per epoch, per dataset/sequence, and hyperparameters
+- Early stopping and decaying LR
 
 ### Kitti Devkit README ###
 ###########################################################################
