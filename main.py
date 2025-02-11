@@ -35,10 +35,11 @@ def main():
     params = load_params(args.params)
 
     device = get_device()
-    model = KittiOdomNN(gru_hidden_size=params['gru_hidden_size'], in_channels=params['img_size'][0]*2, device=device).to(device)
+    in_channels = params['img_size'][0]*2 if params['stack_input_images'] else params['img_size'][0]
+    model = KittiOdomNN(gru_hidden_size=params['gru_hidden_size'], in_channels=in_channels, device=device).to(device)
     # TODO: loss fn should be set outside of this function
     loss_fn = nn.MSELoss()
-    summary(model, (params['img_size'][0]*2, params['img_size'][1], params['img_size'][2]), device=device)
+    summary(model, (in_channels, params['img_size'][1], params['img_size'][2]), device=device)
 
 
     if args.test:

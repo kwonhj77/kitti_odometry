@@ -29,13 +29,13 @@ class KittiOdomNN(nn.Module):
         resnet50 = torchvision.models.resnet50(pretrained=True)
 
         # Adjust first layer to correspond to in_channels=6
-        assert in_channels == 6, f"Currently not compatible with any other channel dims: {in_channels}"
-        conv1_weights = resnet50.conv1.weight.data
-        new_conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        new_conv1.weight.data[:, :3, :, :] = conv1_weights
-        new_conv1.weight.data[:, 3:, :, :] = conv1_weights
+        if in_channels == 6:
+            conv1_weights = resnet50.conv1.weight.data
+            new_conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3, bias=False)
+            new_conv1.weight.data[:, :3, :, :] = conv1_weights
+            new_conv1.weight.data[:, 3:, :, :] = conv1_weights
 
-        resnet50.conv1 = new_conv1
+            resnet50.conv1 = new_conv1
         
         self.backbone = nn.Sequential(*list(resnet50.children())[:-1]) # Remove FC layer
         

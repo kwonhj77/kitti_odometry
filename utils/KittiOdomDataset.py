@@ -1,23 +1,21 @@
 import numpy as np
-import pandas as pd
-import cv2
 import torch
 from torch.utils.data import DataLoader
-import torchvision
 import torchvision.transforms as transforms
-from PIL import Image
 
-from RawDataParser import RawDataParser
+from utils.RawDataParser import RawDataParser
 
 BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
 
 
 class KittiOdomBatch(torch.utils.data.Dataset):
-    def __init__(self, sequence, frame_start_idx, frame_end_idx, img_size, img_mean, img_std):
+    def __init__(self, sequence, frame_start_idx, frame_end_idx, img_size, img_mean, img_std, stack_images):
         seq_fname = f"0{sequence}" if sequence < 10 else str(sequence)
         self.img_mean, self.img_std = img_mean, img_std
+
         assert len(img_size) == 3, f"image dims are invalid {img_size}"
-        assert img_size[0] == 3, f"currently only allowing RGB images {img_size}"
+        self.stack_images = stack_images
+
         self.img_size = (img_size[0], img_size[2], img_size[1])  # CxHxW to CxWxH
         # print(f"----------- \nSeq: {sequence} \n Batch frame range: {frame_start_idx}:{frame_end_idx-1}")
 
@@ -42,23 +40,34 @@ class KittiOdomBatch(torch.utils.data.Dataset):
     def __getitem__(self, index):
         if torch.is_tensor(index):
             index = index.tolist()
-        transform = transforms.Compose([
+
+        if self.stack_images:
+            transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize(mean=self.img_mean+self.img_mean, std=self.img_std+self.img_std),
             ])
-        # Get image from last time and combine as a HxWx6 Tensor
-        if index == 0:
-            img1 = self.raw_dataset.get_cam2(index)
+            # Get image from last time and combine as a HxWx6 Tensor
+            if index == 0:
+                img1 = self.raw_dataset.get_cam2(index)
+            else:
+                img1 = self.raw_dataset.get_cam2(index-1)
+            img1 = self._maybe_resize_image(img1)
+            img1 = np.array(img1)[:, :, ::-1].astype(np.float32) / 255.0
+
+            img2 = self.raw_dataset.get_cam2(index)
+            img2 = self._maybe_resize_image(img2)
+            img2 = np.array(img2)[:, :, ::-1].astype(np.float32) / 255.0
+
+            img_tensor = transform(np.concatenate((img1, img2), axis=2))
         else:
-            img1 = self.raw_dataset.get_cam2(index-1)
-        img1 = self._maybe_resize_image(img1)
-        img1 = np.array(img1)[:, :, ::-1].astype(np.float32) / 255.0
-
-        img2 = self.raw_dataset.get_cam2(index)
-        img2 = self._maybe_resize_image(img2)
-        img2 = np.array(img2)[:, :, ::-1].astype(np.float32) / 255.0
-
-        img_tensor = transform(np.concatenate((img1, img2), axis=2))
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(mean=self.img_mean, std=self.img_std),
+            ])
+            img = self.raw_dataset.get_cam2(index)
+            img = self._maybe_resize_image(img)
+            img = np.array(img)[:, :, ::-1].astype(np.float32) / 255.0
+            img_tensor = transform(img)
         rot = torch.from_numpy(self.rotation[index].flatten()).float()
         pos = torch.from_numpy(self.position[index].flatten()).float()
     
@@ -83,10 +92,11 @@ def _get_batches_from_sequence(sequence, sequence_len, params):
     img_size = params['img_size']
     img_mean = params['img_mean']
     img_std = params['img_std']
+    stack_images = params['stack_input_images']
     batch_datasets = []
     for frame_start_idx in range(0, sequence_len, batch_len):
         frame_end_idx = frame_start_idx+batch_len if frame_start_idx+batch_len <= sequence_len else sequence_len
-        batch_datasets.append(KittiOdomBatch(sequence, frame_start_idx, frame_end_idx, img_size, img_mean, img_std))
+        batch_datasets.append(KittiOdomBatch(sequence, frame_start_idx, frame_end_idx, img_size, img_mean, img_std, stack_images))
     return batch_datasets
 
 def get_batches(sequences, params):
@@ -120,6 +130,7 @@ if __name__ == '__main__':
     params['img_size'] = [3, 376, 1241]
     params['img_mean'] = [0.36713704466819763, 0.3694778382778168, 0.3467831611633301]
     params['img_std'] = [0.31982553005218506, 0.310651570558548, 0.3016820549964905]
+    params['stack_input_images'] = False
     dataset = get_batches(sequences=(0,1), params=params)
     X, rot, pos = next(iter(dataset[0]))
     print(X.shape)
