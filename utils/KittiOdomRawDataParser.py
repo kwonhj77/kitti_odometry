@@ -2,7 +2,7 @@ import os
 import re
 import numpy as np
 import pandas as pd
-
+# DEPRECATED
 # Run this file to generate .csv files for each sequence, which is used for the KittiOdomDataset creation.
 
 IMG_ROOT_DIR = "./datasets/data_odometry_color/dataset/sequences/"

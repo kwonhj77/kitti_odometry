@@ -13,39 +13,40 @@ def test(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, de
 
     for _, dataloader in enumerate(dataloaders):
         assert len(dataloader) == 1, "only 1 batch should be in each dataloader!"
-        dataset_idx = dataloader.dataset.dataset.sequence
+        dataset_idx = dataloader.dataset.raw_dataset.sequence
 
         if dataset_idx not in test_results:
             test_results[dataset_idx] = ResultRecorder(dataset_idx=dataset_idx, train=False)
         
         batch_size = len(dataloader.dataset)
 
-        X, y = next(iter(dataloader))
-        X, y = X.to(device), y.to(device)
-        pred = model(X)
-        loss = loss_fn(pred,y)
-        test_results[dataset_idx].add_batch_results(loss=loss.detach().clone(), label=y, prediction=pred, batch_size=batch_size)
+        X, rot, pos = next(iter(dataloader))
+        X, rot, pos = X.to(device), rot.to(device), pos.to(device)
+
+        # Compute prediction error
+        pred_rot, pred_pos = model(X)
+        
+        loss_rot = loss_fn(pred_rot, rot)
+        loss_pos = loss_fn(pred_pos, pos)
+
+        # Store results
+        label = {
+            "rot": rot,
+            "pos": pos,
+        }
+        pred = {
+            "rot": pred_rot,
+            "pos": pred_pos,
+        }
+
+        loss = {
+            "rot": loss_rot.detach().clone(),
+            "pos": loss_pos.detach().clone(),
+        }
+        
+        test_results[dataset_idx].add_batch_results(loss=loss, label=label, prediction=pred, batch_size=batch_size)
     
     for idx, recorder in test_results.items():
         recorder.calculate_results(verbose=True)
     
     return test_results
-
-
-
-    
-    # for idx, dataloader in enumerate(dataloaders):
-    #     ds_recorder = DatasetResultRecorder(size=len(dataloader.dataset), num_batches=len(dataloader), dataset_idx=dataloader.dataset.dataset.sequence, train=False)
-
-    #     for (X,y) in dataloader:
-    #         X, y = X.to(device), y.to(device)
-    #         pred = model(X)
-    #         ds_recorder.add_batch_results(loss=loss_fn(pred,y), label=y, prediction=pred)
-
-    #     ds_recorder.calculate_results(verbose=True)
-
-    #     test_recorder.append_ds_recorder(ds_recorder)
-
-    # test_recorder.calculate_results(verbose=True)
-
-    # return test_recorder

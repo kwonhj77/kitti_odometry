@@ -1,6 +1,9 @@
 import numpy as np
+import os
 import pandas as pd
+import warnings
 
+RECORDER_KEYS = ["rot_pred", "pos_pred", "rot_label", "pos_label", "rot_l2_loss", "pos_l2_loss", "rot_diffs", "pos_diffs", "size"]
 class ResultRecorder():
     def __init__(self, dataset_idx, train):
         self.dataset_idx = dataset_idx
@@ -10,120 +13,96 @@ class ResultRecorder():
             self.train_or_test = "Test"
 
         # Sequentially added by add_batch_results
-        keys = ["predictions", "labels", "l2_losses", "diffs", "size"]
-        self.batch_results = {key: list() for key in keys}
+        self.batch_results = {key: list() for key in RECORDER_KEYS}
 
         # Calculated with calculate_results
-        self.dataset_mean_loss = None
-        self.dataset_mean_diffs = None
+        self.dataset_mean_rot_loss = None
+        self.dataset_mean_pos_loss = None
+        self.dataset_mean_rot_diffs = None
+        self.dataset_mean_pos_diffs = None
     
     def add_batch_results(self, loss, label, prediction, batch_size):
-        prediction = np.array(prediction.cpu().detach())
-        label = np.array(label.cpu().detach())
-        self.batch_results["predictions"].append(prediction)
-        self.batch_results["labels"].append(label)
-        self.batch_results["l2_losses"].append(loss.cpu().detach().numpy())
-        self.batch_results["diffs"].append(np.abs(prediction-label))
+        prediction = {key: np.array(value.cpu().detach()) for key,value in prediction.items()}
+        label = {key: np.array(value.cpu().detach()) for key,value in label.items()}
+        self.batch_results["rot_pred"].append(prediction["rot"])
+        self.batch_results["pos_pred"].append(prediction["pos"])
+        self.batch_results["rot_label"].append(label["rot"])
+        self.batch_results["pos_label"].append(label["pos"])
+        self.batch_results["rot_l2_loss"].append(loss["rot"].cpu().detach().numpy())
+        self.batch_results["pos_l2_loss"].append(loss["pos"].cpu().detach().numpy())
+        self.batch_results["rot_diffs"].append(np.abs(prediction["rot"]-label["rot"]))
+        self.batch_results["pos_diffs"].append(np.abs(prediction["pos"]-label["pos"]))
         self.batch_results["size"].append(batch_size)
 
     def calculate_results(self, verbose):
-        self.dataset_mean_loss = np.average(self.batch_results["l2_losses"], weights=self.batch_results["size"])
-        mean_diffs_per_batch = []
-        for batch_diff in self.batch_results["diffs"]:
-            mean_diffs_per_batch.append(np.mean(batch_diff, axis=0))
-        self.dataset_mean_diffs = np.average(mean_diffs_per_batch, weights=self.batch_results["size"], axis=0)
+        self.dataset_mean_rot_loss = np.average(self.batch_results["rot_l2_loss"], weights=self.batch_results["size"])
+        self.dataset_mean_pos_loss = np.average(self.batch_results["pos_l2_loss"], weights=self.batch_results["size"])
+        mean_rot_diffs_per_batch = []
+        mean_pos_diffs_per_batch = []
+        for batch_rot_diff, batch_pos_diff in zip(self.batch_results["rot_diffs"], self.batch_results["pos_diffs"]):
+            mean_rot_diffs_per_batch.append(np.mean(batch_rot_diff, axis=0))
+            mean_pos_diffs_per_batch.append(np.mean(batch_pos_diff, axis=0))
+        self.dataset_mean_rot_diffs = np.average(mean_rot_diffs_per_batch, weights=self.batch_results["size"], axis=0)
+        self.dataset_mean_pos_diffs = np.average(mean_pos_diffs_per_batch, weights=self.batch_results["size"], axis=0)
 
         if verbose:
-            mean_diffs_str = [f"{d:.4f}" for d in self.dataset_mean_diffs]
-            print(f"--- \nDataset {self.dataset_idx} {self.train_or_test} Error: \n  Mean Absolute Error: {mean_diffs_str} \n  L2 loss: {self.dataset_mean_loss:.8f} \n---\n")
+            mean_rot_diffs_str = [f"{d:.4f}" for d in self.dataset_mean_rot_diffs]
+            mean_pos_diffs_str = [f"{d:.4f}" for d in self.dataset_mean_pos_diffs]
+            print(f"--- \nDataset {self.dataset_idx} {self.train_or_test} Error: \n")
+            print(f"Mean Rot Diff: {mean_rot_diffs_str} \n  Mean Pos Diff: {mean_pos_diffs_str} \n")
+            print(f"Rot Err: {self.dataset_mean_rot_loss:.6f} \n  Pos Err: {self.dataset_mean_pos_loss:.6f} \n---\n")
 
 
 
-    def to_csv(self, fpath):
-        columns = ['dataset_idx', 'batch_idx'] + [f'{i}_abs_diff' for i in range(1,13)]
-        df = pd.DataFrame(columns=columns)
+    def to_csv(self, fpath, key):
+        assert key in self.batch_results.keys(), f"Invalid key f{key}"
+        with warnings.catch_warnings():
+            warnings.simplefilter(action='ignore', category=FutureWarning)
+            if key.endswith('l2_loss'):
+                columns = ['dataset_idx', 'batch_idx', key, 'size']
+                df = pd.DataFrame(columns=columns)
 
-        for idx, diff in enumerate(self.batch_results["diffs"]):
-            row = [self.dataset_idx, idx] + diff.tolist()
-            df = pd.concat([df, pd.DataFrame([row], columns=columns)], ignore_index=True)
+                for idx, (l2_loss, size) in enumerate(zip(self.batch_results[key], self.batch_results['size'])):
+                    df = pd.concat([df, pd.DataFrame([[self.dataset_idx, idx, l2_loss, size]], columns=columns)], ignore_index=True)
+            else:
+                columns = ['dataset_idx', 'batch_idx'] + [f'{i}_{key}' for i in range(len(self.batch_results[key][0][0]))]
+                df = pd.DataFrame(columns=columns)
 
-        df.to_csv(fpath)
+                for idx, val in enumerate(self.batch_results[key]):
+                    data = []
+                    for i in range(0, val.shape[0]):
+                        data.append([self.dataset_idx, idx] + val[i,:].tolist())
+                    df = pd.concat([df, pd.DataFrame(data, columns=columns)], ignore_index=True)
 
+            df.to_csv(fpath)
+
+
+def save_results(folder_name, train_results, test_results):
+    fpath_tr = f'./results/{folder_name}/train'
+    fpath_te = f'./results/{folder_name}/test'
+    subdirs = RECORDER_KEYS[:-1] # exclude size
+
+    if train_results:
+        if not os.path.exists(fpath_tr):
+            os.makedirs(fpath_tr)
+            for folders in subdirs:
+                os.makedirs(os.path.join(fpath_tr, folders))
+        for epoch, result in enumerate(train_results):
+            for dataset_idx, recorder in result.items():
+                for subdir in subdirs:
+                    recorder.to_csv(os.path.join(fpath_tr,subdir,f'{subdir}_dataset_{dataset_idx}_epoch_{epoch}.csv'), subdir)
     
-
-
-
-
-
-class DatasetResultRecorder():
-    def __init__(self, size, dataset_idx, train):
-        self.size = size
-        self.dataset_idx = dataset_idx
-        if train:
-            self.train_or_test = "Train"
+    if test_results:
+        if not os.path.exists(fpath_te):
+            os.makedirs(fpath_te)
+            for folders in subdirs:
+                os.makedirs(os.path.join(fpath_te, folders))
+        if isinstance(test_results, list):
+            for epoch, result in enumerate(test_results):
+                for dataset_idx, recorder in result.items():
+                    for subdir in subdirs:
+                        recorder.to_csv(os.path.join(fpath_te,subdir,f'{subdir}_dataset_{dataset_idx}_epoch_{epoch}.csv'), subdir)
         else:
-            self.train_or_test = "Test"
-
-        # Sequentially added by add_batch_results
-        self.batch_diffs = []
-        self.batch_losses = []
-
-        # Calculated with calculate_results
-        self.dataset_mean_loss = None
-        self.dataset_mean_diffs = None
-    
-    def add_batch_results(self, loss, label, prediction):
-        diff = np.mean(np.abs(np.array(label.cpu().detach()) - np.array(prediction.cpu().detach())), axis=0)
-        self.batch_diffs.append(diff)
-        self.batch_losses.append(loss.cpu().detach().numpy())
-
-    def calculate_results(self, verbose):
-        self.dataset_mean_loss = sum(self.batch_losses) / self.num_batches
-        self.dataset_mean_diffs = np.mean(self.batch_diffs, axis=0)
-
-        if verbose:
-            mean_diff_str = [f"{d:.4f}" for d in self.dataset_mean_diffs]
-            print(f"{self.train_or_test} Dataset #{self.dataset_idx} Error: \n Mean Average Error: {mean_diff_str}, L2: {self.dataset_mean_loss:.8f} \n")
-
-
-class TestResultRecorder():
-    def __init__(self, train):
-        if train:
-            self.train_or_test = "Train"
-        else:
-            self.train_or_test = "Test"
-
-        # Sequentially added by append_ds_recorder
-        self.size, self.num_batches = 0, 0
-        self.batch_losses, self.batch_diffs = [], []
-        self.ds_recorders = []
-
-        # Calculated with calculate_results
-        self.mean_loss, self.mean_diffs = 0, [0 for _ in range(12)]
-
-    
-    def append_ds_recorder(self, ds_recorder: DatasetResultRecorder):
-        self.size += ds_recorder.size
-        self.num_batches += ds_recorder.num_batches
-        self.batch_losses.extend(ds_recorder.batch_losses)
-        self.batch_diffs.extend(ds_recorder.batch_diffs)
-        self.ds_recorders.append(ds_recorder)
-    
-    def calculate_results(self, verbose):
-        self.mean_loss = (sum(self.batch_losses) / self.num_batches)
-        diff_sums = np.sum(self.batch_diffs, axis=0)
-        self.mean_diffs = [(d / self.size).item() for d in diff_sums]
-
-        if verbose:
-            mean_diffs_str = [f"{d:.4f}" for d in self.mean_diffs]
-            print(f"--- Total {self.train_or_test} Error: \n Mean Absolute Error: {mean_diffs_str}, L2 loss: {self.mean_loss:.8f} ---\n")
-
-    def to_csv(self, fpath: str):
-        columns = ['dataset_idx','l2_loss',] + [f'{i}_MAE' for i in range(1,13)]
-        df = pd.DataFrame(columns=columns)
-        for idx, rec in enumerate(self.ds_recorders):
-            for loss, diff in zip(rec.batch_losses, rec.batch_diffs):
-                row = [idx, loss] + diff.tolist()
-                df = pd.concat([df, pd.DataFrame([row], columns=columns)], ignore_index=True)
-
-        df.to_csv(fpath)
+            for dataset_idx, recorder in test_results.items():
+                for subdir in subdirs:
+                    recorder.to_csv(os.path.join(fpath_te,subdir,f'{subdir}_dataset_{dataset_idx}.csv'), subdir)

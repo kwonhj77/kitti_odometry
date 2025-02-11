@@ -1,10 +1,23 @@
+# TODOs
+- Intermediate checkpoints between epochs, while saving results
+- Visualizer w/ plots of loss per epoch, per dataset/sequence, and hyperparameters
+- Pretrained model loading and fine-tuning
+
+
+
+
 ### Example Commands ###
 Load from checkpoint and save eval results
-python main.py --test --save_test_results default --load_checkpoint default --params default
+default:
+python main.py --test --save_results default --load_checkpoint default --params default
+quick:
+python main.py --test --save_results quick --load_checkpoint quick --params quick
 
 Train from scratch and save train, test results
-python main.py --train --save_train_results default --test --save_test_results default --save_checkpoint default --params default
-
+default:
+python main.py --train --save_results default --test --save_checkpoint default --params default
+quick:
+python main.py --train --save_results quick --test --save_checkpoint quick --params quick
 
 ### Kitti Devkit README ###
 ###########################################################################

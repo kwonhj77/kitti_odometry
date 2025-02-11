@@ -16,29 +16,48 @@ def _train(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, 
     num_batches = len(dataloaders)
     for batch, dataloader in enumerate(dataloaders):
         assert len(dataloader) == 1, "only 1 batch should be in each dataloader!"
-        dataset_idx = dataloader.dataset.dataset.sequence
+        dataset_idx = dataloader.dataset.raw_dataset.sequence
 
         if dataset_idx not in train_results:
             train_results[dataset_idx] = ResultRecorder(dataset_idx=dataset_idx, train=True)
 
         batch_size = len(dataloader.dataset)
 
-        X, y = next(iter(dataloader))
-        X, y = X.to(device), y.to(device)
+        X, rot, pos = next(iter(dataloader))
+        X, rot, pos = X.to(device), rot.to(device), pos.to(device)
 
         # Compute prediction error
-        pred = model(X)
-        loss = loss_fn(pred, y)
-
-        train_results[dataset_idx].add_batch_results(loss=loss.detach().clone(), label=y, prediction=pred, batch_size=batch_size)
+        pred_rot, pred_pos = model(X)
+        
+        loss_rot = loss_fn(pred_rot, rot)
+        loss_pos = loss_fn(pred_pos, pos)
 
         # Backprop
-        loss.backward()
+        torch.autograd.backward(loss_rot, loss_pos)
+        # loss_rot.backward()
+        # loss_pos.backward()
         optimizer.step()
         optimizer.zero_grad()
 
+        # Store results
+        label = {
+            "rot": rot,
+            "pos": pos,
+        }
+        pred = {
+            "rot": pred_rot,
+            "pos": pred_pos,
+        }
+
+        loss = {
+            "rot": loss_rot.detach().clone(),
+            "pos": loss_pos.detach().clone(),
+        }
+
+        train_results[dataset_idx].add_batch_results(loss=loss, label=label, prediction=pred, batch_size=batch_size)
+
         if batch % 10 == 0:
-            print(f"Train L2 loss: {loss.item():>7f}  [batch {batch:>5d}/{num_batches:>5d}]\n")
+            print(f"Train L2 rotation err: {loss_rot.item():>7f} - L2 position err: {loss_pos.item():>7f} - [batch {batch:>3d}/{num_batches:>4d}]\n")
     
     for idx, recorder in train_results.items():
         recorder.calculate_results(verbose=True)
@@ -50,6 +69,17 @@ def train_and_eval(train_dataloaders: list[DataLoader], test_dataloaders: list[D
     train_start = time.time()
     optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'], betas=(0.9, 0.999), eps=1e-08)
 
+    # Freeze Resnet backbone
+    for param in model.backbone.parameters():
+        param.requires_grad = False
+
+    for param in model.gru.parameters():
+        param.requires_grad = True
+    for param in model.rot_head.parameters():
+        param.requires_grad = True
+    for param in model.pos_head.parameters():
+        param.requires_grad = True
+    
     train_results = []
     test_results = []
 
