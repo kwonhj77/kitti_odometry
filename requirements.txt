@@ -4,3 +4,7 @@ numpy
 pandas
 requests
 pykitti
+torch
+torchvision
+torchaudio
+torch-summary

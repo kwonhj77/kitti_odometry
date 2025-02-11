@@ -7,7 +7,7 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 
-import pykitti
+from RawDataParser import RawDataParser
 
 BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
 
@@ -21,7 +21,7 @@ class KittiOdomBatch(torch.utils.data.Dataset):
         self.img_size = (img_size[0], img_size[2], img_size[1])  # CxHxW to CxWxH
         # print(f"----------- \nSeq: {sequence} \n Batch frame range: {frame_start_idx}:{frame_end_idx-1}")
 
-        batch = pykitti.odometry(BASE_DIR, seq_fname, frames=range(frame_start_idx, frame_end_idx, 1))
+        batch = RawDataParser(BASE_DIR, seq_fname, frames=range(frame_start_idx, frame_end_idx, 1))
 
         # Adjust the rotations and positions so that the first frame in the batch is the global origin.
         init_rot, init_pos = self._split_rotation_and_position(batch.poses[0])
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     params['img_size'] = [3, 376, 1241]
     params['img_mean'] = [0.36713704466819763, 0.3694778382778168, 0.3467831611633301]
     params['img_std'] = [0.31982553005218506, 0.310651570558548, 0.3016820549964905]
-    dataset = get_batches(sequences=(0,8), params=params)
+    dataset = get_batches(sequences=(0,1), params=params)
     X, rot, pos = next(iter(dataset[0]))
     print(X.shape)
     print(rot.shape)
