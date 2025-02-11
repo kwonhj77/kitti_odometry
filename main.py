@@ -35,12 +35,21 @@ def main():
     params = load_params(args.params)
 
     device = get_device()
-    in_channels = params['img_size'][0]*2 if params['stack_input_images'] else params['img_size'][0]
-    model = KittiOdomNN(gru_hidden_size=params['gru_hidden_size'], in_channels=in_channels, device=device).to(device)
-    # TODO: loss fn should be set outside of this function
-    loss_fn = nn.MSELoss()
-    summary(model, (in_channels, params['img_size'][1], params['img_size'][2]), device=device)
+    input_dims = [params['img_size'] for _ in range(2)] if params['stack_input_images'] else params['img_size']
+    model = KittiOdomNN(stack_input=params['stack_input_images'], gru_hidden_size=params['gru_hidden_size'], device=device).to(device)
+    # Freeze pretrained backbone
+    for param in model.backbone.parameters():
+        param.requires_grad = False
+    # Explicitly unfreeze other layers
+    for param in model.gru.parameters():
+        param.requires_grad = True
+    for param in model.rot_head.parameters():
+        param.requires_grad = True
+    for param in model.pos_head.parameters():
+        param.requires_grad = True
+    summary(model, input_dims, device=device)
 
+    loss_fn = nn.MSELoss()
 
     if args.test:
         test_dataloaders = get_batches(params['test_sequences'], params)

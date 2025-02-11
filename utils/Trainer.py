@@ -23,19 +23,17 @@ def _train(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, 
 
         batch_size = len(dataloader.dataset)
 
-        X, rot, pos = next(iter(dataloader))
-        X, rot, pos = X.to(device), rot.to(device), pos.to(device)
+        X_prev, X_curr, rot, pos = next(iter(dataloader))
+        X_prev, X_curr, rot, pos = X_prev.to(device), X_curr.to(device), rot.to(device), pos.to(device)
 
         # Compute prediction error
-        pred_rot, pred_pos = model(X)
+        pred_rot, pred_pos = model(X_prev, X_curr)
         
         loss_rot = loss_fn(pred_rot, rot)
         loss_pos = loss_fn(pred_pos, pos)
 
         # Backprop
         torch.autograd.backward(loss_rot, loss_pos)
-        # loss_rot.backward()
-        # loss_pos.backward()
         optimizer.step()
         optimizer.zero_grad()
 
@@ -68,17 +66,6 @@ def train_and_eval(train_dataloaders: list[DataLoader], test_dataloaders: list[D
     print("################## Training start ##################")
     train_start = time.time()
     optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'], betas=(0.9, 0.999), eps=1e-08)
-
-    # Freeze Resnet backbone
-    for param in model.backbone.parameters():
-        param.requires_grad = False
-
-    for param in model.gru.parameters():
-        param.requires_grad = True
-    for param in model.rot_head.parameters():
-        param.requires_grad = True
-    for param in model.pos_head.parameters():
-        param.requires_grad = True
     
     train_results = []
     test_results = []

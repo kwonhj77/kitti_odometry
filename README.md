@@ -9,15 +9,15 @@
 ### Example Commands ###
 Load from checkpoint and save eval results
 default:
-python main.py --test --save_results default --load_checkpoint default --params default
+python main.py --test --save_results default_stacked --load_checkpoint default_stacked --params default_stacked > ./logs.txt
 quick:
-python main.py --test --save_results quick --load_checkpoint quick --params quick
+python main.py --test --save_results quick_stacked --load_checkpoint quick_stacked --params quick_stacked > ./logs.txt
 
 Train from scratch and save train, test results
 default:
-python main.py --train --save_results default --test --save_checkpoint default --params default
+python main.py --train --save_results default_stacked --test --save_checkpoint default_stacked --params default_stacked > ./logs.txt
 quick:
-python main.py --train --save_results quick --test --save_checkpoint quick --params quick
+python main.py --train --save_results quick_stacked --test --save_checkpoint quick_stacked --params quick_stacked > ./logs.txt
 
 ### Kitti Devkit README ###
 ###########################################################################

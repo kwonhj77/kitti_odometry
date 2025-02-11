@@ -1,11 +1,12 @@
 import numpy as np
+from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 
 from utils.RawDataParser import RawDataParser
 
-BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
+BASE_DIR = r'./dataset'
 
 
 class KittiOdomBatch(torch.utils.data.Dataset):
@@ -14,6 +15,7 @@ class KittiOdomBatch(torch.utils.data.Dataset):
         self.img_mean, self.img_std = img_mean, img_std
 
         assert len(img_size) == 3, f"image dims are invalid {img_size}"
+        assert img_size[0] == 3, f"image channels are invalid {img_size[0]}"
         self.stack_images = stack_images
 
         self.img_size = (img_size[0], img_size[2], img_size[1])  # CxHxW to CxWxH
@@ -41,37 +43,31 @@ class KittiOdomBatch(torch.utils.data.Dataset):
         if torch.is_tensor(index):
             index = index.tolist()
 
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.img_mean, std=self.img_std),
+        ])
+
+        img_curr = self.raw_dataset.get_cam2(index)
+        img_curr = self._maybe_resize_image(img_curr)
+        img_curr = np.array(img_curr)[:, :, ::-1].astype(np.float32) / 255.0
+        img_curr_tensor = transform(img_curr)
+
+        img_prev_tensor = None
         if self.stack_images:
-            transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=self.img_mean+self.img_mean, std=self.img_std+self.img_std),
-            ])
-            # Get image from last time and combine as a HxWx6 Tensor
             if index == 0:
-                img1 = self.raw_dataset.get_cam2(index)
+                img_prev = self.raw_dataset.get_cam2(index)
             else:
-                img1 = self.raw_dataset.get_cam2(index-1)
-            img1 = self._maybe_resize_image(img1)
-            img1 = np.array(img1)[:, :, ::-1].astype(np.float32) / 255.0
+                img_prev = self.raw_dataset.get_cam2(index-1)
+            img_prev = self._maybe_resize_image(img_prev)
+            img_prev = np.array(img_prev)[:, :, ::-1].astype(np.float32) / 255.0
+            img_prev_tensor = transform(img_prev)
 
-            img2 = self.raw_dataset.get_cam2(index)
-            img2 = self._maybe_resize_image(img2)
-            img2 = np.array(img2)[:, :, ::-1].astype(np.float32) / 255.0
-
-            img_tensor = transform(np.concatenate((img1, img2), axis=2))
-        else:
-            transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=self.img_mean, std=self.img_std),
-            ])
-            img = self.raw_dataset.get_cam2(index)
-            img = self._maybe_resize_image(img)
-            img = np.array(img)[:, :, ::-1].astype(np.float32) / 255.0
-            img_tensor = transform(img)
-        rot = torch.from_numpy(self.rotation[index].flatten()).float()
+        rot_euler = self._convert_euler_angle(self.rotation[index])
+        rot = torch.from_numpy(rot_euler.flatten()).float()
         pos = torch.from_numpy(self.position[index].flatten()).float()
     
-        return img_tensor, rot, pos
+        return img_prev_tensor, img_curr_tensor, rot, pos
     
     def _maybe_resize_image(self, image):
         size = self.img_size[1:]
@@ -86,6 +82,9 @@ class KittiOdomBatch(torch.utils.data.Dataset):
         rot = pose[:3, :3]
         pos = pose[:3, -1]
         return rot, pos
+
+    def _convert_euler_angle(self, rot):
+        return Rotation.from_matrix(rot).as_euler('xyz', degrees=False)
 
 def _get_batches_from_sequence(sequence, sequence_len, params):
     batch_len = params['batch_len']
