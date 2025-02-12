@@ -12,25 +12,27 @@ The dataset must reside under `./datasets` with the following directory structur
     │   ├── 01.txt
     │   ├── ...
     │   └── 10.txt
-    └── sequences (extract from .tar files)
-        ├── 00 (extract from 00.tar)
+    └── sequences (not included in repo)
+        ├── 00
         │   ├── image_2
         │   ├── calib.txt
         │   └── times.txt
-        ├── 01 (extract from 01.tar)
+        ├── 01
         │   ├── image_2
         │   ├── calib.txt
         │   └── times.txt
         ├── ...
-        └── 10 (extract from 10.tar)
+        └── 10
             ├── image_2
             ├── calib.txt
             └── times.txt
 ```
-All that's needed is to download the .tar files and extract under ./datasets/sequences. Sequences 11-21 are not needed.
+KITTI dataset can be found on https://www.cvlibs.net/datasets/kitti/. Sequences 11-21 are not needed.
 
 2. Install dependencies
 ` pip install -r ./requirements.txt `
+
+Python version > 3.9 is recommended.
 
 Optional: Verify CUDA / Nvidia drivers are installed
 Run ` nvcc --version ` and ` nvidia-smi ` to check CUDA version and NVIDIA drivers

@@ -89,9 +89,11 @@ def train_and_eval(train_dataloaders: List[DataLoader], test_dataloaders: List[D
         
         if save_results:
             print(f"Saving epoch results to ./results/{save_results}")
-            train_epoch_result.save_results(folder_name=save_results, epoch=epoch+1)
+            for recorder in train_epoch_result.values():
+                recorder.save_results(folder_name=save_results, epoch=epoch+1)
             if run_test:
-                test_epoch_result.save_results(folder_name=save_results, epoch=epoch+1)
+                for recorder in test_epoch_result.values():
+                    recorder.save_results(folder_name=save_results, epoch=epoch+1)
 
     train_end = time.time() - train_start
     print(f"Time Elapsed during training: " + convert_time(train_end))

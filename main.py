@@ -1,15 +1,18 @@
 import argparse
-import os
 import torch
 from torch import nn
 from torchsummary import summary
+
+# Force utf-8 encoding to resolve issues printing to terminal
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 
 # Local imports
 from utils.KittiOdomNN import KittiOdomNN
 from utils.KittiOdomDataset import get_batches
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
-# from utils.ResultRecorder import save_results
 from utils.Trainer import train_and_eval
 from utils.Tester import test
 
