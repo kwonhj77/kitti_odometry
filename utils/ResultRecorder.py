@@ -54,7 +54,7 @@ class ResultRecorder():
 
 
 
-    def to_csv(self, fpath, key):
+    def _to_csv(self, fpath, key):
         assert key in self.batch_results.keys(), f"Invalid key f{key}"
         with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -75,34 +75,23 @@ class ResultRecorder():
                     df = pd.concat([df, pd.DataFrame(data, columns=columns)], ignore_index=True)
 
             df.to_csv(fpath)
-
-
-def save_results(folder_name, train_results, test_results):
-    fpath_tr = f'./results/{folder_name}/train'
-    fpath_te = f'./results/{folder_name}/test'
-    subdirs = RECORDER_KEYS[:-1] # exclude size
-
-    if train_results:
-        if not os.path.exists(fpath_tr):
-            os.makedirs(fpath_tr)
-            for folders in subdirs:
-                os.makedirs(os.path.join(fpath_tr, folders))
-        for epoch, result in enumerate(train_results):
-            for dataset_idx, recorder in result.items():
-                for subdir in subdirs:
-                    recorder.to_csv(os.path.join(fpath_tr,subdir,f'{subdir}_dataset_{dataset_idx}_epoch_{epoch}.csv'), subdir)
     
-    if test_results:
-        if not os.path.exists(fpath_te):
-            os.makedirs(fpath_te)
-            for folders in subdirs:
-                os.makedirs(os.path.join(fpath_te, folders))
-        if isinstance(test_results, list):
-            for epoch, result in enumerate(test_results):
-                for dataset_idx, recorder in result.items():
-                    for subdir in subdirs:
-                        recorder.to_csv(os.path.join(fpath_te,subdir,f'{subdir}_dataset_{dataset_idx}_epoch_{epoch}.csv'), subdir)
+    def save_results(self, folder_name, epoch):
+        if self.train_or_test == "Train":
+            fpath = f'./results/{folder_name}/train'
         else:
-            for dataset_idx, recorder in test_results.items():
-                for subdir in subdirs:
-                    recorder.to_csv(os.path.join(fpath_te,subdir,f'{subdir}_dataset_{dataset_idx}.csv'), subdir)
+            fpath = f'./results/{folder_name}/test'
+
+        subfolders = RECORDER_KEYS[:-1] # exclude size
+
+        if not os.path.exists(fpath):
+            os.makedirs(fpath)
+            for key in subfolders:
+                if not os.path.exists(os.path.join(fpath, key)):
+                    os.makedirs(os.path.join(fpath, key))
+                if self.epoch is None:
+                    self._to_csv(os.path.join(fpath, key, f'{key}_dataset_{self.dataset_idx}.csv'), key)
+                else:
+                    self._to_csv(os.path.join(fpath, key, f'{key}_dataset_{self.dataset_idx}_epoch_{epoch}.csv'), key)
+
+    

@@ -1,11 +1,12 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from typing import List
 
 from utils.ResultRecorder import ResultRecorder
 
 @torch.no_grad()  # Disable gradient calculation to save compute
-def test(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, device: torch.device):
+def test(dataloaders: List[DataLoader], model: nn.Module, loss_fn: nn.Module, device: torch.device):
     
     model.eval()
 
@@ -20,11 +21,11 @@ def test(dataloaders: list[DataLoader], model: nn.Module, loss_fn: nn.Module, de
         
         batch_size = len(dataloader.dataset)
 
-        X, rot, pos = next(iter(dataloader))
-        X, rot, pos = X.to(device), rot.to(device), pos.to(device)
+        X_prev, X_curr, rot, pos = next(iter(dataloader))
+        X_prev, X_curr, rot, pos = X_prev.to(device), X_curr.to(device), rot.to(device), pos.to(device)
 
         # Compute prediction error
-        pred_rot, pred_pos = model(X)
+        pred_rot, pred_pos = model(X_prev, X_curr)
         
         loss_rot = loss_fn(pred_rot, rot)
         loss_pos = loss_fn(pred_pos, pos)

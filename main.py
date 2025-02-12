@@ -9,7 +9,7 @@ from utils.KittiOdomNN import KittiOdomNN
 from utils.KittiOdomDataset import get_batches
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
-from utils.ResultRecorder import save_results
+# from utils.ResultRecorder import save_results
 from utils.Trainer import train_and_eval
 from utils.Tester import test
 
@@ -58,17 +58,17 @@ def main():
         test_dataloaders = []
 
     if args.load_checkpoint:
-        train_results = []
         fpath = f'./checkpoints/{args.load_checkpoint}' + '.pt'
         print("Loading checkpoint from: \n" + fpath)
         checkpoint = torch.load(fpath, weights_only=True)
         model.load_state_dict(checkpoint)
         if args.test:
             print("Evaluating checkpoint...")
-            test_results = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
+            test_result = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
+            test_result.save_results(folder_name=args.save_results, epoch=None)
     elif args.train:
         train_dataloaders = get_batches(params['train_sequences'], params)
-        train_results, test_results = train_and_eval(
+        train_and_eval(
             train_dataloaders=train_dataloaders,
             test_dataloaders=test_dataloaders,
             model=model,
@@ -76,21 +76,23 @@ def main():
             device=device,
             params=params,
             run_test=args.test,
+            save_checkpoint=args.save_checkpoint,
+            save_results=args.save_results
         )
     else:
         print("Neither train nor --load_checkpoint was specified! Exiting early...")
         return
     
-    if args.save_checkpoint:
-        if not os.path.exists('./checkpoints'):
-            os.makedirs('./checkpoints')
-        fpath = f'./checkpoints/{args.save_checkpoint}' + '.pt'
-        print("Saving model checkpoint to: \n" + fpath)
-        torch.save(model.state_dict(), fpath)
+    # if args.save_checkpoint:
+    #     if not os.path.exists('./checkpoints'):
+    #         os.makedirs('./checkpoints')
+    #     fpath = f'./checkpoints/{args.save_checkpoint}' + '.pt'
+    #     print("Saving model checkpoint to: \n" + fpath)
+    #     torch.save(model.state_dict(), fpath)
 
-    if args.save_results:
-        print(f"Saving results to ./results/{args.save_results}")
-        save_results(args.save_results, train_results, test_results)
+    # if args.save_results:
+    #     print(f"Saving results to ./results/{args.save_results}")
+    #     save_results(args.save_results, train_results, test_results)
 
 
 
