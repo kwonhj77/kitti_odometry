@@ -42,15 +42,15 @@ Run ` nvcc --version ` and ` nvidia-smi ` to check CUDA version and NVIDIA drive
 ### Example Commands ###
 Load from checkpoint and save eval results
 default:
-python main.py --test --save_results default_stacked --load_checkpoint default_stacked --params default_stacked > ./logs.txt
+python main.py --test --save_results default_stacked --load_checkpoint default_stacked_epoch_1 --params default_stacked | tee ./logs.txt
 quick:
-python main.py --test --save_results quick_stacked --load_checkpoint quick_stacked --params quick_stacked > ./logs.txt
+python main.py --test --save_results quick_stacked --load_checkpoint quick_stacked_epoch_1 --params quick_stacked | tee ./logs.txt
 
 Train from scratch and save train, test results
 default:
-python main.py --train --save_results default_stacked --test --save_checkpoint default_stacked --params default_stacked > ./logs.txt
+python main.py --train --save_results default_stacked --test --save_checkpoint default_stacked --params default_stacked | tee ./logs.txt
 quick:
-python main.py --train --save_results quick_stacked --test --save_checkpoint quick_stacked --params quick_stacked > ./logs.txt
+python main.py --train --save_results quick_stacked --test --save_checkpoint quick_stacked --params quick_stacked | tee ./logs.txt
 
 # TODOs
 - Intermediate checkpoints between epochs, while saving results

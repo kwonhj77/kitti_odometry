@@ -68,7 +68,8 @@ def main():
         if args.test:
             print("Evaluating checkpoint...")
             test_result = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
-            test_result.save_results(folder_name=args.save_results, epoch=None)
+            for recorder in test_result.values():
+                recorder.save_results(folder_name=args.save_results, epoch=None)
     elif args.train:
         train_dataloaders = get_batches(params['train_sequences'], params)
         train_and_eval(

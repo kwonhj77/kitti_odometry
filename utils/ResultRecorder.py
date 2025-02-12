@@ -89,7 +89,7 @@ class ResultRecorder():
             for key in subfolders:
                 if not os.path.exists(os.path.join(fpath, key)):
                     os.makedirs(os.path.join(fpath, key))
-                if self.epoch is None:
+                if epoch is None:
                     self._to_csv(os.path.join(fpath, key, f'{key}_dataset_{self.dataset_idx}.csv'), key)
                 else:
                     self._to_csv(os.path.join(fpath, key, f'{key}_dataset_{self.dataset_idx}_epoch_{epoch}.csv'), key)
