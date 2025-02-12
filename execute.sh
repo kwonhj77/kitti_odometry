@@ -1,5 +1,5 @@
 #!/bin/bash
 
-python main.py --train --save_train_results batch32 --test --save_test_results batch32 --save_checkpoint batch32 --params batch32
-python main.py --train --save_train_results batch64 --test --save_test_results batch64 --save_checkpoint batch64 --params batch64
-python main.py --train --save_train_results batch256 --test --save_test_results batch256 --save_checkpoint batch256 --params batch256
+python main.py --train --save_results stacked_256 --test --save_checkpoint stacked_256 --params stacked_256 | tee ./stacked_256.txt
+python main.py --train --save_results stacked_512 --test --save_checkpoint stacked_512 --params stacked_512 | tee ./stacked_512.txt
+python main.py --train --save_results stacked_1024 --test --save_checkpoint stacked_1024 --params stacked_1024 | tee ./stacked_1024.txt
