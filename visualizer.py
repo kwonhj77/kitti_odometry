@@ -1,55 +1,98 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.cm as cm
 
-
-CSV_NAME = "./results/test/default_epoch_0.csv"
+DIRECTORY = "./results/quick_stacked/"
+TRAIN_OR_TEST = "train"
+BATCH_KEYS_TO_PLOT = ["rot_l2_loss", "pos_l2_loss"]
+FRAME_KEYS_TO_PLOT = ["rot_diffs", "pos_diffs"]
+DATASET = [3,]
+EPOCHS = [1,]
 
 # Function to close plot when "Esc" is pressed
 def _on_key(event):
     if event.key == "escape":
         plt.close()
 
-def plot_l2_losses_per_dataset():
-    df = pd.read_csv(CSV_NAME)
+# Plots L2 losses in a dataset, with each point being the l2 loss for the batch.
+def plot_per_batch(dir_path, key, dataset, epoch=None):
+    dataset = f"0{dataset}" if dataset < 10 else str(dataset)
 
-    # Get number of datasets
-    dataset_indexes = sorted(df['dataset_idx'].unique())
+    if epoch is None:
+        csv_path = os.path.join(dir_path, f"{key}_dataset_{dataset}.csv")
+    else:
+        csv_path = os.path.join(dir_path, f"{key}_dataset_{dataset}_epoch_{epoch}.csv")
+    df = pd.read_csv(csv_path)
 
-    l2_losses = dict()
-    for idx in dataset_indexes:
-        l2_losses[idx] = df[df['dataset_idx'] == idx].reset_index(drop=True)['l2_loss']
-    
-    # Create figure
+    batch_idx = df['batch_idx']
+    y = df[key]
+
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.canvas.mpl_connect("key_press_event", _on_key)  # Bind the key event
-    for dataset_idx, val in l2_losses.items():
-        plt.plot(val.index, val, label=f'dataset_{dataset_idx}')
+    title = f"{key} for dataset {dataset}: epoch {epoch}" if epoch is not None else f"{key} for dataset {dataset}"
+    fig.suptitle(title)
+    ax.plot(batch_idx, y)
+    ax.set_xlabel("batch #")
+    ax.set_ylabel(key)
+    ax.grid(True)
 
-    plt.xlabel("batch #")
-    plt.ylabel("l2_loss")
-    plt.legend()
-    plt.grid(True)
+def plot_per_frame(dir_path, key, dataset, epoch=None):
+    dataset = f"0{dataset}" if dataset < 10 else str(dataset)
 
-    plt.show()
+    if epoch is None:
+        csv_path = os.path.join(dir_path, f"{key}_dataset_{dataset}.csv")
+    else:
+        csv_path = os.path.join(dir_path, f"{key}_dataset_{dataset}_epoch_{epoch}.csv")
+    df = pd.read_csv(csv_path)
 
-def plot_l2_losses_per_batch():
-    df = pd.read_csv(CSV_NAME)['l2_loss']
+    y_len = len(df.columns[df.columns.str.contains(key)])
+
+    batch_idx = df['batch_idx'].tolist()
+    x = df.index.tolist()
     
-    # Create figure
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # Normalize the supplemental values for colormap usage
+    norm = mcolors.Normalize(vmin=min(batch_idx), vmax=max(batch_idx))
+    cmap = cm.get_cmap('viridis')  # Choose a colormap
+
+
+    fig, ax = plt.subplots(3, 1, figsize=(10, 6))
     fig.canvas.mpl_connect("key_press_event", _on_key)  # Bind the key event
+    title = f"{key} for dataset {dataset}: epoch {epoch}" if epoch is not None else f"{key} for dataset {dataset}"
+    fig.suptitle(title)
 
-    plt.plot(df.index, df)
-
-    plt.xlabel("batch #")
-    plt.ylabel("l2_loss")
-    plt.grid(True)
-
-    plt.show()
+    for i in range(y_len):
+        y = df[f"{i}_{key}"].tolist()
+        for j in range(len(x)):
+            ax[i].plot(x[j], y[j], color=cmap(norm(batch_idx[j])))
+        ax[i].set_xlabel("frame #")
+        ax[i].set_ylabel(y)
+        ax[i].set_title(y)
+        ax[i].grid(True)
 
 
 
 
 if __name__ == '__main__':
+    base_path = os.path.join(DIRECTORY, TRAIN_OR_TEST)
+    for key in BATCH_KEYS_TO_PLOT:
+        for dataset in DATASET:
+            if EPOCHS is not None:
+                for epoch in EPOCHS:
+                    dir_path = os.path.join(base_path, key)
+                    plot_per_batch(dir_path, key, dataset, epoch)
+            else:
+                pass
+    for key in FRAME_KEYS_TO_PLOT:
+        for dataset in DATASET:
+            if EPOCHS is not None:
+                for epoch in EPOCHS:
+                    dir_path = os.path.join(base_path, key)
+                    plot_per_frame(dir_path, key, dataset, epoch)
+            else:
+                pass
+    plt.show()
+
     # plot_l2_losses_per_dataset()
-    plot_l2_losses_per_batch()
+    # plot_l2_losses_per_batch()

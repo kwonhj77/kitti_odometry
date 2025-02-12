@@ -1,4 +1,5 @@
 import argparse
+import time
 import torch
 from torch import nn
 from torchsummary import summary
@@ -13,6 +14,7 @@ from utils.KittiOdomNN import KittiOdomNN
 from utils.KittiOdomDataset import get_batches
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
+from utils.Timer import convert_time
 from utils.Trainer import train_and_eval
 from utils.Tester import test
 
@@ -35,6 +37,7 @@ def get_argparser():
 
 
 def main():
+    exec_start_time = time.time()
     args = get_argparser()
     params = load_params(args.params)
 
@@ -56,7 +59,10 @@ def main():
     loss_fn = nn.MSELoss()
 
     if args.test:
+        get_batches_start_time = time.time()
         test_dataloaders = get_batches(params['test_sequences'], params)
+        get_batches_time = convert_time(time.time() - get_batches_start_time)
+        print(f"Test dataloaders created in {get_batches_time}")
     else:
         test_dataloaders = []
 
@@ -67,11 +73,17 @@ def main():
         model.load_state_dict(checkpoint)
         if args.test:
             print("Evaluating checkpoint...")
+            test_start_time = time.time()
             test_result = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
+            test_time = convert_time(time.time() - test_start_time)
+            print(f"Test results calculated in {test_time}")
             for recorder in test_result.values():
                 recorder.save_results(folder_name=args.save_results, epoch=None)
     elif args.train:
+        get_batches_start_time = time.time()
         train_dataloaders = get_batches(params['train_sequences'], params)
+        get_batches_time = convert_time(time.time() - get_batches_start_time)
+        print(f"Train dataloaders created in {get_batches_time}")
         train_and_eval(
             train_dataloaders=train_dataloaders,
             test_dataloaders=test_dataloaders,
@@ -85,19 +97,9 @@ def main():
         )
     else:
         print("Neither train nor --load_checkpoint was specified! Exiting early...")
-        return
     
-    # if args.save_checkpoint:
-    #     if not os.path.exists('./checkpoints'):
-    #         os.makedirs('./checkpoints')
-    #     fpath = f'./checkpoints/{args.save_checkpoint}' + '.pt'
-    #     print("Saving model checkpoint to: \n" + fpath)
-    #     torch.save(model.state_dict(), fpath)
-
-    # if args.save_results:
-    #     print(f"Saving results to ./results/{args.save_results}")
-    #     save_results(args.save_results, train_results, test_results)
-
+    exec_time = convert_time(time.time() - exec_start_time)
+    print(f"Execution completed in {exec_time}")
 
 
 
