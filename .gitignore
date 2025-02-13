@@ -4,3 +4,4 @@
 checkpoints/*
 dataset/sequences/*
 results/*
+archive/archived_results/*

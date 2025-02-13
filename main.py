@@ -11,7 +11,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 
 # Local imports
 from utils.KittiOdomNN import KittiOdomNN
-from utils.KittiOdomDataset import get_batches
+from utils.KittiOdomDataset import get_dataloader
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
 from utils.Timer import convert_time
@@ -60,11 +60,11 @@ def main():
 
     if args.test:
         get_batches_start_time = time.time()
-        test_dataloaders = get_batches(params['test_sequences'], params)
+        test_dataloader = get_dataloader(params['test_sequences'], params, shuffle=False)
         get_batches_time = convert_time(time.time() - get_batches_start_time)
         print(f"Test dataloaders created in {get_batches_time}")
     else:
-        test_dataloaders = []
+        test_dataloader = []
 
     if args.load_checkpoint:
         fpath = f'./checkpoints/{args.load_checkpoint}' + '.pt'
@@ -74,19 +74,19 @@ def main():
         if args.test:
             print("Evaluating checkpoint...")
             test_start_time = time.time()
-            test_result = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
+            test_result = test(dataloader=test_dataloader, model=model, loss_fn=loss_fn, device=device)
             test_time = convert_time(time.time() - test_start_time)
             print(f"Test results calculated in {test_time}")
             for recorder in test_result.values():
                 recorder.save_results(folder_name=args.save_results, epoch=None)
     elif args.train:
         get_batches_start_time = time.time()
-        train_dataloaders = get_batches(params['train_sequences'], params)
+        train_dataloader = get_dataloader(params['train_sequences'], params, shuffle=True)
         get_batches_time = convert_time(time.time() - get_batches_start_time)
         print(f"Train dataloaders created in {get_batches_time}")
         train_and_eval(
-            train_dataloaders=train_dataloaders,
-            test_dataloaders=test_dataloaders,
+            train_dataloader=train_dataloader,
+            test_dataloader=test_dataloader,
             model=model,
             loss_fn=loss_fn,
             device=device,

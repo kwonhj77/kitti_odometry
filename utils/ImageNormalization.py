@@ -3,7 +3,7 @@ import cv2
 import pykitti
 
 BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
-SEQUENCES = [0, 1, 2, 3, 4, 5, 6, 7]
+SEQUENCES = [3, 4, 5, 6, 7, 10]
 def main():
     std = []
     mean = []

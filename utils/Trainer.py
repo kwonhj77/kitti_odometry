@@ -10,27 +10,18 @@ from utils.ResultRecorder import ResultRecorder
 from utils.Timer import convert_time
 from utils.Tester import test
 
-def _train(dataloaders: List[DataLoader], model: nn.Module, loss_fn: nn.Module, optimizer: torch.optim.Optimizer, device: torch.device):
+def _train(dataloader: DataLoader, model: nn.Module, loss_fn: nn.Module, optimizer: torch.optim.Optimizer, device: torch.device):
 
     model.train()
 
-    train_results = {}
-    num_batches = len(dataloaders)
-    for batch, dataloader in enumerate(dataloaders):
-        assert len(dataloader) == 1, "only 1 batch should be in each dataloader!"
-        dataset_idx = dataloader.dataset.raw_dataset.sequence
-
-        if dataset_idx not in train_results:
-            train_results[dataset_idx] = ResultRecorder(dataset_idx=dataset_idx, train=True)
-
-        batch_size = len(dataloader.dataset)
-
-        X_prev, X_curr, rot, pos = next(iter(dataloader))
+    train_recorder = ResultRecorder(train=True)
+    num_batches = len(dataloader)
+    for batch_idx, (X_prev, X_curr, rot, pos, seq, timestamp) in enumerate(dataloader):
         X_prev, X_curr, rot, pos = X_prev.to(device), X_curr.to(device), rot.to(device), pos.to(device)
 
         # Compute prediction error
         pred_rot, pred_pos = model(X_prev, X_curr)
-        
+
         loss_rot = loss_fn(pred_rot, rot)
         loss_pos = loss_fn(pred_pos, pos)
 
@@ -54,17 +45,16 @@ def _train(dataloaders: List[DataLoader], model: nn.Module, loss_fn: nn.Module, 
             "pos": loss_pos.detach().clone(),
         }
 
-        train_results[dataset_idx].add_batch_results(loss=loss, label=label, prediction=pred, batch_size=batch_size)
+        train_recorder.add_batch_results(loss=loss, label=label, prediction=pred, dataset_idx=seq, batch_idx=batch_idx, timestamp=timestamp)
 
-        if batch % 10 == 0:
-            print(f"Train L2 rotation err: {loss_rot.item():>7f} - L2 position err: {loss_pos.item():>7f} - [batch {batch:>3d}/{num_batches:>4d}]\n")
-    
-    for idx, recorder in train_results.items():
-        recorder.calculate_results(verbose=True)
+        if batch_idx % 10 == 0:
+            print(f"Train L2 rotation err: {loss_rot.item():>7f} - L2 position err: {loss_pos.item():>7f} - [batch {batch_idx:>3d}/{num_batches:>4d}]\n")    
 
-    return train_results
+    train_recorder.calculate_results(verbose=True)
 
-def train_and_eval(train_dataloaders: List[DataLoader], test_dataloaders: List[DataLoader], model: nn.Module, loss_fn: nn.Module, device: torch.device, params: dict, run_test: bool, save_checkpoint: str, save_results: str):
+    return train_recorder
+
+def train_and_eval(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.Module, loss_fn: nn.Module, device: torch.device, params: dict, run_test: bool, save_checkpoint: str, save_results: str):
     print("################## Training start ##################")
     train_start = time.time()
     optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'], betas=(0.9, 0.999), eps=1e-08)
@@ -72,10 +62,10 @@ def train_and_eval(train_dataloaders: List[DataLoader], test_dataloaders: List[D
     for epoch in range(params['epochs']):
         print(f"Epoch {epoch+1}\n-------------------------------")
         epoch_start = time.time()
-        train_epoch_result = _train(dataloaders=train_dataloaders, model=model, loss_fn=loss_fn, optimizer=optimizer, device=device)
+        train_epoch_recorder = _train(dataloader=train_dataloader, model=model, loss_fn=loss_fn, optimizer=optimizer, device=device)
         if run_test:
             print("Evaluating epoch...")
-            test_epoch_result = test(dataloaders=test_dataloaders, model=model, loss_fn=loss_fn, device=device)
+            test_epoch_recorder = test(dataloader=test_dataloader, model=model, loss_fn=loss_fn, device=device)
         epoch_end = time.time() - epoch_start
         print(f"Epoch {epoch+1} Time Elapsed: " + convert_time(epoch_end))
 
@@ -89,11 +79,9 @@ def train_and_eval(train_dataloaders: List[DataLoader], test_dataloaders: List[D
         
         if save_results:
             print(f"Saving epoch results to ./results/{save_results}")
-            for recorder in train_epoch_result.values():
-                recorder.save_results(folder_name=save_results, epoch=epoch+1)
+            train_epoch_recorder.save_results(folder_name=save_results, epoch=epoch+1)
             if run_test:
-                for recorder in test_epoch_result.values():
-                    recorder.save_results(folder_name=save_results, epoch=epoch+1)
+                test_epoch_recorder.save_results(folder_name=save_results, epoch=epoch+1)
 
     train_end = time.time() - train_start
     print(f"Time Elapsed during training: " + convert_time(train_end))
