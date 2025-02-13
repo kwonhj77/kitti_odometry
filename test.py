@@ -1,62 +1,51 @@
 import pykitti
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
-# basedir = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
-# sequence = '00'
+def compare_checkpoints(checkpoint_path1, checkpoint_path2):
+    """
+    Checks if two PyTorch checkpoints have the same weight values.
 
-# dataset = pykitti.odometry(basedir, sequence, frames=range(0, 50, 5))
-# # Grab some data
-# second_pose = dataset.poses[1]
-# # first_gray = next(iter(dataset.gray))
-# # first_cam1 = next(iter(dataset.cam1))
-# first_rgb = dataset.get_rgb(0)
-# first_cam2 = dataset.get_cam2(0)
-# third_velo = dataset.get_velo(2)
+    Args:
+        checkpoint_path1 (str): Path to the first checkpoint file.
+        checkpoint_path2 (str): Path to the second checkpoint file.
 
-# # Display some of the data
-# np.set_printoptions(precision=4, suppress=True)
-# print('\nSequence: ' + str(dataset.sequence))
-# print('\nFrame range: ' + str(dataset.frames))
+    Returns:
+        bool: True if the checkpoints have the same weights, False otherwise.
+    """
+    checkpoint1 = torch.load(checkpoint_path1)
+    checkpoint2 = torch.load(checkpoint_path2)
 
-# # print('\nGray stereo pair baseline [m]: ' + str(dataset.calib.b_gray))
-# print('\nRGB stereo pair baseline [m]: ' + str(dataset.calib.b_rgb))
+    if checkpoint1.keys() != checkpoint2.keys():
+        print("Checkpoints have different keys.")
+        return False
 
-# print('\nFirst timestamp: ' + str(dataset.timestamps[0]))
-# print('\nSecond ground truth pose:\n' + str(second_pose))
+    issame = True
+    for key in checkpoint1:
+      if isinstance(checkpoint1[key], dict):
+        if checkpoint1[key].keys() != checkpoint2[key].keys():
+          print(f"Sub-dictionaries for key '{key}' have different keys.")
+          issame = False
+        for sub_key in checkpoint1[key]:
+          if not torch.equal(checkpoint1[key][sub_key], checkpoint2[key][sub_key]):
+            print(f"Values for key '{key}' and sub-key '{sub_key}' are different.")
+            issame = False
+      elif not torch.equal(checkpoint1[key], checkpoint2[key]):
+        print(f"Values for key '{key}' are different.")
+        issame = False
+    return issame
 
-# f, ax = plt.subplots(2, 2, figsize=(15, 5))
-# # ax[0, 0].imshow(first_gray[0], cmap='gray')
-# # ax[0, 0].set_title('Left Gray Image (cam0)')
+if __name__ == "__main__":
+    # Example usage:
+    checkpoint1_path = "./checkpoints/stacked_1024_epoch_1.pt"
+    checkpoint2_path = "./checkpoints/stacked_1024_epoch_5.pt"
 
-# # ax[0, 1].imshow(first_cam1, cmap='gray')
-# # ax[0, 1].set_title('Right Gray Image (cam1)')
-
-# ax[1, 0].imshow(first_cam2)
-# ax[1, 0].set_title('Left RGB Image (cam2)')
-
-# ax[1, 1].imshow(first_rgb[1])
-# ax[1, 1].set_title('Right RGB Image (cam3)')
-# plt.show()
-# print("Exiting...")
+    # Assuming checkpoint files exist, compare them
+    if compare_checkpoints(checkpoint1_path, checkpoint2_path):
+        print("Checkpoints have the same weights.")
+    else:
+        print("Checkpoints have different weights.")
 
 
-basedir = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
-sequence = '00'
 
-dataset = pykitti.odometry(basedir, sequence, frames=range(0, 4540, 5))
-# Remove last row from poses
-poses = dataset.poses
-
-# Copied code
-ground_truth = np.zeros((len(poses), 3, 4))
-for i in range(len(poses)):
-    ground_truth[i] = np.array(poses[i][:3]).reshape((3, 4))
-# %matplotlib widget
-fig = plt.figure(figsize=(7,6))
-traj = fig.add_subplot(111, projection='3d')
-traj.plot(ground_truth[:,:,3][:,0], ground_truth[:,:,3][:,1], ground_truth[:,:,3][:,2])
-traj.set_xlabel('x')
-traj.set_ylabel('y')
-traj.set_zlabel('z')
-plt.show()

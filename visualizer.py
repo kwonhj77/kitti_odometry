@@ -5,12 +5,12 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 
 ### EDIT ME ###
-DIRECTORY = "./results/default_stacked/"
+DIRECTORY = "./results/stacked_1024/"
 TRAIN_OR_TEST = "train"
 BATCH_KEYS_TO_PLOT = ["rot_l2_loss", "pos_l2_loss"]
 FRAME_KEYS_TO_PLOT = ["rot_diffs", "pos_diffs"]
 DATASET = [0,2,8,9]
-EPOCHS = [1,2]
+EPOCHS = [1,2,3,4,5]
 ###############
 
 # Function to close plot when "Esc" is pressed

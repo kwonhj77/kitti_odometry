@@ -51,6 +51,8 @@ default:
 python main.py --train --save_results default_stacked --test --save_checkpoint default_stacked --params default_stacked | tee ./default_stacked_logs.txt
 quick:
 python main.py --train --save_results quick_stacked --test --save_checkpoint quick_stacked --params quick_stacked | tee ./quick_stacked_logs.txt
+stacked_1024:
+python main.py --train --save_results stacked_1024 --test --save_checkpoint stacked_1024 --params stacked_1024 | tee ./stacked_1024.txt
 
 # TODOs
 - Intermediate checkpoints between epochs, while saving results
