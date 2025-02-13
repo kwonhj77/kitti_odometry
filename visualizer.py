@@ -6,11 +6,13 @@ import matplotlib.cm as cm
 
 ### EDIT ME ###
 DIRECTORY = "./results/stacked_1024/"
-TRAIN_OR_TEST = "train"
+TRAIN_OR_TEST = "test"
 BATCH_KEYS_TO_PLOT = ["rot_l2_loss", "pos_l2_loss"]
-FRAME_KEYS_TO_PLOT = ["rot_diffs", "pos_diffs"]
-DATASET = [0,2,8,9]
-EPOCHS = [1,2,3,4,5]
+# FRAME_KEYS_TO_PLOT = ["rot_diffs", "pos_diffs"]
+FRAME_KEYS_TO_PLOT = []
+# DATASET = [0,2,8,9]
+DATASET = [3, 4, 5, 6, 7, 10]
+EPOCHS = [1,2,3,4,5,6,7,8,9,10]
 ###############
 
 # Function to close plot when "Esc" is pressed
