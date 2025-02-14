@@ -5,7 +5,7 @@ import warnings
 
 PER_FRAME_KEYS = ["rot_pred", "pos_pred", "rot_label", "pos_label", "rot_diffs", "pos_diffs"]
 PER_BATCH_KEYS = ["rot_l2_loss", "pos_l2_loss"]
-INDEX_KEYS = ["dataset_idx", "batch_idx", "timestamp"]
+INDEX_KEYS = ["batch_idx", "dataset_idx", "timestamp"]
 RECORDER_KEYS =  PER_FRAME_KEYS + PER_BATCH_KEYS + INDEX_KEYS + ["size",]
 
 class ResultRecorder():
@@ -31,7 +31,6 @@ class ResultRecorder():
         # per batch items
         self.batch_results["rot_l2_loss"].append(loss["rot"].cpu().detach().numpy())
         self.batch_results["pos_l2_loss"].append(loss["pos"].cpu().detach().numpy())
-        self.batch_results["dataset_idx"].append(dataset_idx)
         self.batch_results["batch_idx"].append(batch_idx)
 
         # per frame items
@@ -41,6 +40,7 @@ class ResultRecorder():
         self.batch_results["pos_label"].append(label["pos"])
         self.batch_results["rot_diffs"].append(np.abs(prediction["rot"]-label["rot"]))
         self.batch_results["pos_diffs"].append(np.abs(prediction["pos"]-label["pos"]))
+        self.batch_results["dataset_idx"].append(dataset_idx)
         self.batch_results["timestamp"].append(timestamp)
 
         # Used for calculate_results
@@ -71,24 +71,22 @@ class ResultRecorder():
         with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=FutureWarning)
             if key in PER_BATCH_KEYS:
-                columns = ['dataset_idx', 'batch_idx', key]
+                columns = ['batch_idx', key]
                 df = pd.DataFrame(columns=columns)
 
                 for i in range(len(self.batch_results[key])):
-                    dataset_idx = self.batch_results['dataset_idx'][i]
                     batch_idx = self.batch_results['batch_idx'][i]
                     l2_loss = self.batch_results[key][i]
-                    df = pd.concat([df, pd.DataFrame([[dataset_idx, batch_idx, l2_loss]], columns=columns)], ignore_index=True)
+                    df = pd.concat([df, pd.DataFrame([[batch_idx, l2_loss]], columns=columns)], ignore_index=True)
             elif key in PER_FRAME_KEYS:
-                columns = ['dataset_idx', 'batch_idx', 'timestamp'] + [f'{i}_{key}' for i in range(len(self.batch_results[key][0][0]))]
+                columns = ['batch_idx', 'dataset_idx', 'timestamp'] + [f'{i}_{key}' for i in range(len(self.batch_results[key][0][0]))]
                 df = pd.DataFrame(columns=columns)
 
                 for i, val in enumerate(self.batch_results[key]):
-                    dataset_idx = self.batch_results['dataset_idx'][i]
                     batch_idx = self.batch_results['batch_idx'][i]
                     data = []
                     for j in range(val.shape[0]):
-                        data.append([dataset_idx, batch_idx, self.batch_results['timestamp'][i][j]] + val[j,:].tolist())
+                        data.append([batch_idx, self.batch_results['dataset_idx'][i][j], self.batch_results['timestamp'][i][j]] + val[j,:].tolist())
                     df = pd.concat([df, pd.DataFrame(data, columns=columns)], ignore_index=True)
 
             df.to_csv(fpath)

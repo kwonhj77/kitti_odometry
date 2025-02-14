@@ -25,8 +25,10 @@ def _train(dataloader: DataLoader, model: nn.Module, loss_fn: nn.Module, optimiz
         loss_rot = loss_fn(pred_rot, rot)
         loss_pos = loss_fn(pred_pos, pos)
 
+        total_loss = loss_rot + loss_pos
+        
         # Backprop
-        torch.autograd.backward(loss_rot, loss_pos)
+        total_loss.backward()        
         optimizer.step()
         optimizer.zero_grad()
 

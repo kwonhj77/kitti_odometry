@@ -4,7 +4,7 @@ import pykitti
 
 BASE_DIR = r'C:\Users\Will Haley\Documents\GitHub\kitti_odometry\dataset'
 SEQUENCES = [3, 4, 5, 6, 7, 10]
-def main():
+def normalize_images():
     std = []
     mean = []
     for seq in SEQUENCES:
@@ -39,5 +39,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    normalize_images()
     print("Exiting...")

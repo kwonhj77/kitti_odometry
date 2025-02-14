@@ -10,7 +10,7 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 
 # Local imports
-from utils.KittiOdomNN import KittiOdomNN
+from models.KittiOdomNN import KittiOdomNN
 from utils.KittiOdomDataset import get_dataloader
 from utils.DeviceLoader import get_device
 from utils.ParamLoader import load_params
@@ -60,7 +60,7 @@ def main():
 
     if args.test:
         get_batches_start_time = time.time()
-        test_dataloader = get_dataloader(params['test_sequences'], params, shuffle=False)
+        test_dataloader = get_dataloader(params['test_sequences'], params, shuffle=True)
         get_batches_time = convert_time(time.time() - get_batches_start_time)
         print(f"Test dataloaders created in {get_batches_time}")
     else:
