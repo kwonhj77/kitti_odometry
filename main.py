@@ -1,4 +1,5 @@
 import argparse
+import os
 import time
 import torch
 from torch import nn
@@ -17,6 +18,7 @@ from utils.ParamLoader import load_params
 from utils.Timer import convert_time
 from utils.Trainer import train_and_eval
 from utils.Tester import test
+from utils.Visualizer import generate_plots
 
 def get_argparser():
     # Parse input arguments
@@ -26,7 +28,6 @@ def get_argparser():
     )
     parser.add_argument('--train', action='store_true', help='Add arg to train. Otherwise uses .pt specified in --checkpoint')
     parser.add_argument('--save_results', type=str, default=None, help='Saves results to .csv files under a subdirectory. If ommitted, will not save results.')
-    parser.add_argument('--test', action='store_true', help='Add arg to evaluate model. Otherwise skips evaluation step.')
     parser.add_argument('--load_checkpoint', type=str, default=None, help='Local path to .pt which contains model checkpoint')
     parser.add_argument('--save_checkpoint', type=str, default=None, help='Local directory to save model checkpoints. If ommitted, will not save checkpoint.')
     parser.add_argument('--params', type=str, default=None, help='Yaml filename under ./checkpoints which contains hyperparameters to tune. If ommitted, will use default params from default.yaml')
@@ -42,8 +43,8 @@ def main():
     params = load_params(args.params)
 
     device = get_device()
-    input_dims = [params['img_size'] for _ in range(2)] if params['stack_input_images'] else params['img_size']
-    model = KittiOdomNN(stack_input=params['stack_input_images'], gru_hidden_size=params['gru_hidden_size'], device=device).to(device)
+    input_dims = [params['img_size'] for _ in range(2)]
+    model = KittiOdomNN(gru_hidden_size=params['gru_hidden_size'], device=device).to(device)
     # Freeze pretrained backbone
     for param in model.backbone.parameters():
         param.requires_grad = False
@@ -58,27 +59,24 @@ def main():
 
     loss_fn = nn.MSELoss()
 
-    if args.test:
-        get_batches_start_time = time.time()
-        test_dataloader = get_dataloader(params['test_sequences'], params, shuffle=True)
-        get_batches_time = convert_time(time.time() - get_batches_start_time)
-        print(f"Test dataloaders created in {get_batches_time}")
-    else:
-        test_dataloader = []
+    get_batches_start_time = time.time()
+    test_dataloader = get_dataloader(params['test_sequences'], params, shuffle=True)
+    get_batches_time = convert_time(time.time() - get_batches_start_time)
+    print(f"Test dataloaders created in {get_batches_time}")
 
     if args.load_checkpoint:
         fpath = f'./checkpoints/{args.load_checkpoint}' + '.pt'
         print("Loading checkpoint from: \n" + fpath)
         checkpoint = torch.load(fpath, weights_only=True)
         model.load_state_dict(checkpoint)
-        if args.test:
-            print("Evaluating checkpoint...")
-            test_start_time = time.time()
-            test_result = test(dataloader=test_dataloader, model=model, loss_fn=loss_fn, device=device)
-            test_time = convert_time(time.time() - test_start_time)
-            print(f"Test results calculated in {test_time}")
-            for recorder in test_result.values():
-                recorder.save_results(folder_name=args.save_results, epoch=None)
+
+        print("Evaluating checkpoint...")
+        test_start_time = time.time()
+        test_result = test(dataloader=test_dataloader, model=model, loss_fn=loss_fn, device=device)
+        test_time = convert_time(time.time() - test_start_time)
+        print(f"Test results calculated in {test_time}")
+        for recorder in test_result.values():
+            recorder.save_results(folder_name=args.save_results, epoch=None)
     elif args.train:
         get_batches_start_time = time.time()
         train_dataloader = get_dataloader(params['train_sequences'], params, shuffle=True)
@@ -89,15 +87,24 @@ def main():
             test_dataloader=test_dataloader,
             model=model,
             loss_fn=loss_fn,
+            early_stopping_patience=params['early_stopping_patience'],
+            best_val_loss=params['best_val_loss'],
             device=device,
             params=params,
-            run_test=args.test,
             save_checkpoint=args.save_checkpoint,
             save_results=args.save_results
         )
     else:
         print("Neither train nor --load_checkpoint was specified! Exiting early...")
     
+
+    if args.save_results:
+        if args.train:
+            generate_plots(os.path.join('./results/',args.save_results), "train", params["epochs"])
+            generate_plots(os.path.join('./results/',args.save_results), "test", params["epochs"])
+        elif args.load_checkpoint:
+            generate_plots(os.path.join('./results/',args.save_results), "test", None)
+
     exec_time = convert_time(time.time() - exec_start_time)
     print(f"Execution completed in {exec_time}")
 

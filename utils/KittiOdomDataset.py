@@ -9,7 +9,7 @@ from utils.RawDataParser import RawDataParser
 BASE_DIR = r'./dataset'
 
 class KittiOdomBatch(torch.utils.data.Dataset):
-    def __init__(self, sequence, frame_start_idx, frame_end_idx, params):
+    def __init__(self, sequence, frame_start_idx, frame_end_idx, params, abs_labels=False):
         img_size = params['img_size']
         self.img_mean = params['img_mean']
         self.img_std = params['img_std']
@@ -44,6 +44,7 @@ class KittiOdomBatch(torch.utils.data.Dataset):
             self.rotation.append(rot)
             self.position.append(pos)
         self.raw_dataset = batch
+        self.abs_labels = abs_labels
 
     def __len__(self):
         return len(list(self.raw_dataset.frames))
@@ -73,26 +74,33 @@ class KittiOdomBatch(torch.utils.data.Dataset):
 
         # Get current and t-1 rotation
         rot_curr = self.rotation[index]
-        if index == 0:
-            rot_prev_inv = self.rotation[index]
+        if self.abs_labels:
+            rot_euler = self._convert_euler_angle(rot_curr)
+            rot_tensor = torch.from_numpy(rot_euler.flatten()).float()
         else:
-            rot_prev_inv = self.rotation[index-1]
-        assert np.linalg.det(rot_prev_inv) != 0, "Rotation matrix is singular! This shouldn't ever be the case AFAIK..."
-        rot_prev_inv = np.linalg.inv(rot_prev_inv)
-        rot_curr = np.matmul(rot_curr, rot_prev_inv)
-        rot_euler = self._convert_euler_angle(rot_curr)
-        rot_tensor = torch.from_numpy(rot_euler.flatten()).float()
-        rot_tensor = self._normalize_tensor(rot_tensor, self.rot_mean, self.rot_std) if self.normalize_rot else rot_tensor
+            if index == 0:
+                rot_prev_inv = np.eye(3)
+            else:
+                rot_prev_inv = self.rotation[index-1]
+            assert np.linalg.det(rot_prev_inv) != 0, "Rotation matrix is singular! This shouldn't ever be the case AFAIK..."
+            rot_prev_inv = np.linalg.inv(rot_prev_inv)
+            rot_curr = np.matmul(rot_curr, rot_prev_inv)
+            rot_euler = self._convert_euler_angle(rot_curr)
+            rot_tensor = torch.from_numpy(rot_euler.flatten()).float()
+            rot_tensor = self._normalize_tensor(rot_tensor, self.rot_mean, self.rot_std) if self.normalize_rot else rot_tensor
 
         # Get current and t-1 position
         pos_curr = self.position[index]
-        if index == 0:
-            pos_prev = self.position[index]
+        if self.abs_labels:
+            pos_tensor = torch.from_numpy(pos_curr.flatten()).float()
         else:
-            pos_prev = self.position[index-1]
-        pos_curr = pos_curr - pos_prev
-        pos_tensor = torch.from_numpy(pos_curr.flatten()).float()
-        pos_tensor = self._normalize_tensor(pos_tensor, self.pos_mean, self.pos_std) if self.normalize_pose else pos_tensor
+            if index == 0:
+                pos_prev = np.zeros((1,3))
+            else:
+                pos_prev = self.position[index-1]
+            pos_curr = pos_curr - pos_prev
+            pos_tensor = torch.from_numpy(pos_curr.flatten()).float()
+            pos_tensor = self._normalize_tensor(pos_tensor, self.pos_mean, self.pos_std) if self.normalize_pose else pos_tensor
 
         # Get metadata
         seq_index = int(self.raw_dataset.sequence)
@@ -153,7 +161,6 @@ if __name__ == '__main__':
     params['img_size'] = [3, 376, 1241]
     params['img_mean'] = [0.36713704466819763, 0.3694778382778168, 0.3467831611633301]
     params['img_std'] = [0.31982553005218506, 0.310651570558548, 0.3016820549964905]
-    params['stack_input_images'] = True
     dataloader = get_dataloader(sequences=(0,1), params=params, shuffle=True)
     X_prev, X_curr, rot, pos, seq, timestamp = next(iter(dataloader))
     print(X_prev.shape)

@@ -6,10 +6,8 @@ from torchsummary import summary
 
 
 class KittiOdomNN(nn.Module):
-    def __init__(self, stack_input: bool, gru_hidden_size: int, device=None):
+    def __init__(self, gru_hidden_size: int, device=None):
         super().__init__()
-
-        self.stack_input = stack_input
 
         backbone_pretrained = torchvision.models.efficientnet_b0(pretrained=True)
         
@@ -44,12 +42,11 @@ class KittiOdomNN(nn.Module):
         x_curr = self.flatten(x_curr)
         x_curr = self.dropout(x_curr)
 
-        if self.stack_input:
-            x_prev = self.backbone(x_prev)
-            x_prev = self.flatten(x_prev)
-            x_prev = self.dropout(x_prev)
+        x_prev = self.backbone(x_prev)
+        x_prev = self.flatten(x_prev)
+        x_prev = self.dropout(x_prev)
 
-            x = torch.cat((x_curr, x_prev), dim=1)
+        x = torch.cat((x_curr, x_prev), dim=1)
 
         x, _ = self.gru(x)
 
@@ -64,7 +61,7 @@ if __name__ == '__main__':
     # model = torchvision.models.shufflenet_v2_x1_0(pretrained=True)
     # print(model)
     # summary(model, (3, 376, 1241), device=device)
-    model = KittiOdomNN(stack_input=True, gru_hidden_size=1024, device=device)
+    model = KittiOdomNN(gru_hidden_size=1024, device=device)
     # Freeze pretrained backbone
     for param in model.backbone.parameters():
         param.requires_grad = False

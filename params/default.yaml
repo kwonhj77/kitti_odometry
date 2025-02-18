@@ -3,8 +3,9 @@ test_sequences: [3, 4, 5, 6, 7, 10]
 epochs: 2
 batch_len: 100
 lr: 0.0001
-gru_hidden_size: 32
-stack_input_images: False
+early_stopping_patience: 5
+best_val_loss: null
+gru_hidden_size: 1024
 img_size: [3, 376, 1241]
 img_mean: [0.36808231472969055, 0.3676293194293976, 0.34145641326904297]
 img_std: [0.3212873339653015, 0.3089142441749573, 0.2956773340702057]

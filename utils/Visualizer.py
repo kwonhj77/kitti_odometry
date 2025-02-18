@@ -5,13 +5,9 @@ import numpy as np
 import os
 import pandas as pd
 
-### EDIT ME ###
-DIRECTORY = "./results/stacked_256/"
 BATCH_KEYS_TO_PLOT = ["rot_l2_loss", "pos_l2_loss"]
-FRAME_KEYS_TO_PLOT = ["rot_diffs", "pos_diffs"]
-# FRAME_KEYS_TO_PLOT = []
-EPOCHS = [1,2,3,4,5,6,7,8,9,10]
-###############
+# FRAME_KEYS_TO_PLOT = ["rot_diffs", "pos_diffs"]
+FRAME_KEYS_TO_PLOT = []
 
 # Function to close plot when "Esc" is pressed
 def _on_key(event):
@@ -19,8 +15,10 @@ def _on_key(event):
         plt.close('all')
 
 # Plots train and validation loss per epoch.
-def plot_train_vs_val(train_path, test_path, key, epochs):
+def plot_train_vs_val(base_dir, key, epochs):
     assert epochs is not None
+    train_path = os.path.join(base_dir, "train", key)
+    test_path = os.path.join(base_dir, "test", key)
     train_losses = []
     test_losses = []
     for epoch in epochs:
@@ -36,6 +34,15 @@ def plot_train_vs_val(train_path, test_path, key, epochs):
 
     ax.plot(epochs, train_losses, label="train")
     ax.plot(epochs, test_losses, label="test")
+
+    epoch_step = len(epochs)//10 if len(epochs) > 10 else 1
+    for i in range(0, len(epochs), epoch_step):
+        x = epochs[i]
+        tr_y = train_losses[i]
+        te_y = test_losses[i]
+        ax.annotate(f"{tr_y:.2f}", (x,tr_y))
+        ax.annotate(f"{te_y:.2f}", (x,te_y))
+
     title = f"{key}: Train vs Validation"
     fig.suptitle(title)
     ax.set_xlabel("epoch #")
@@ -43,7 +50,7 @@ def plot_train_vs_val(train_path, test_path, key, epochs):
     ax.grid(True)
     ax.legend()
 
-    fig.savefig(os.path.join(DIRECTORY, f"{key}_train_vs_val.png"))
+    fig.savefig(os.path.join(base_dir, f"{key}_train_vs_val.png"))
     plt.close(fig)
 
 
@@ -123,24 +130,31 @@ def plot_per_frame(dir_path, key, epoch=None):
     fig.savefig(os.path.join(dir_path, f"{key}_epoch_{epoch}.png"))
     plt.close(fig)
 
-if __name__ == '__main__':
-    base_path = os.path.join(DIRECTORY)
-    for folder in ["train", "test"]:
-        for key in BATCH_KEYS_TO_PLOT:
-            dir_path = os.path.join(base_path, folder, key)
-            plot_per_batch(dir_path, key, EPOCHS)
-                    
+def generate_plots(base_dir, train_or_test, epochs):
+    for key in BATCH_KEYS_TO_PLOT:
+        dir_path = os.path.join(base_dir, train_or_test, key)
+        if epochs is not None:
+            plot_per_batch(dir_path, key, [epoch for epoch in range(1, epochs+1)])
+        else:
+            plot_per_batch(dir_path, key, None)
+        
         for key in FRAME_KEYS_TO_PLOT:
-            if EPOCHS is not None:
-                dir_path = os.path.join(base_path, folder, key)
-                for epoch in EPOCHS:
+            dir_path = os.path.join(base_dir, train_or_test, key)
+            if epochs is not None:
+                for epoch in range(1, epochs+1):
                     plot_per_frame(dir_path, key, epoch)
             else:
                 plot_per_frame(dir_path, key, None)
-
-    # Generate train vs validation loss plots
-    if EPOCHS is not None:
+    
+    if epochs is not None:
         for key in BATCH_KEYS_TO_PLOT:
-            train_path = os.path.join(DIRECTORY, "train", key)
-            test_path = os.path.join(DIRECTORY, "test", key)
-            plot_train_vs_val(train_path=train_path, test_path=test_path, key=key, epochs=EPOCHS)
+            plot_train_vs_val(base_dir=base_dir, key=key, epochs=[epoch for epoch in range(1, epochs+1)])
+
+
+if __name__ == '__main__':
+    ### EDIT ME ###
+    base_directory = "./results/stacked_1024_3/"
+    epochs = 9
+    ###############
+    generate_plots(base_directory, "train", epochs)
+    generate_plots(base_directory, "test", epochs)

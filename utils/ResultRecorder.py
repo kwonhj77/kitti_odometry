@@ -40,8 +40,8 @@ class ResultRecorder():
         self.batch_results["pos_label"].append(label["pos"])
         self.batch_results["rot_diffs"].append(np.abs(prediction["rot"]-label["rot"]))
         self.batch_results["pos_diffs"].append(np.abs(prediction["pos"]-label["pos"]))
-        self.batch_results["dataset_idx"].append(dataset_idx)
-        self.batch_results["timestamp"].append(timestamp)
+        self.batch_results["dataset_idx"].append(dataset_idx.numpy())
+        self.batch_results["timestamp"].append(timestamp.numpy())
 
         # Used for calculate_results
         self.batch_results["size"].append(len(timestamp))
